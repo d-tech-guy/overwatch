@@ -1,26 +1,184 @@
+
 @import "tailwindcss";
 
+/*
+ * OverWatch Design System
+ *
+ * Monochrome intelligence platform theme.
+ * Sharp corners. Border-first layouts. Mono Sans typography.
+ * Dark mode default.
+ */
+
+/* -------------------------------------------------------------------------
+ * Typography — IBM Plex Mono (closest to "Mono Sans" on Google Fonts)
+ * ------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------
+ * CSS Custom Properties — Design Tokens
+ * ------------------------------------------------------------------------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Background layers */
+  --background: #0a0a0a;
+  --background-secondary: #111111;
+  --background-tertiary: #161616;
+
+  /* Cards & panels */
+  --card: #141414;
+  --card-hover: #1a1a1a;
+
+  /* Borders */
+  --border: #262626;
+  --border-strong: #333333;
+
+  /* Text hierarchy */
+  --foreground: #fafafa;
+  --foreground-secondary: #a3a3a3;
+  --foreground-muted: #525252;
+
+  /* Semantic — used sparingly for status only */
+  --status-critical: #ef4444;
+  --status-high: #f97316;
+  --status-medium: #eab308;
+  --status-low: #22c55e;
+
+  /* shadcn/ui token mapping */
+  --radius: 0rem; /* Sharp corners — no rounding ever */
+  
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);
+  --primary-foreground: var(--background);
+  --secondary: var(--background-secondary);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--background-secondary);
+  --muted-foreground: var(--foreground-muted);
+  --accent: var(--background-secondary);
+  --accent-foreground: var(--foreground);
+  --destructive: var(--status-critical);
+  --destructive-foreground: var(--foreground);
+  --input: var(--border);
+  --ring: var(--border-strong);
 }
 
+/* -------------------------------------------------------------------------
+ * Tailwind v4 Theme Extension
+ * ------------------------------------------------------------------------- */
 @theme inline {
   --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
+  --color-background-tertiary: var(--background-tertiary);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-status-critical: var(--status-critical);
+  --color-status-high: var(--status-high);
+  --color-status-medium: var(--status-medium);
+  --color-status-low: var(--status-low);
+  
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --font-mono: "IBM Plex Mono", "Courier New", monospace;
+  --font-sans: "IBM Plex Mono", "Courier New", monospace;
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+  --radius-2xl: var(--radius);
+  --radius-3xl: var(--radius);
+  --radius-4xl: var(--radius);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* -------------------------------------------------------------------------
+ * Base Reset
+ * ------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  border-radius: 0 !important; /* Enforce sharp corners globally */
+}
+
+html {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "IBM Plex Mono", "Courier New", monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100%;
+}
+
+.header-font {
+  font-family: var(--font-heading)
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* -------------------------------------------------------------------------
+ * Typography Scale
+ * ------------------------------------------------------------------------- */
+h1, h2, h3, h4, h5, h6 {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* -------------------------------------------------------------------------
+ * Scrollbar — subtle monochrome
+ * ------------------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground-muted);
+}
+
+/* -------------------------------------------------------------------------
+ * Selection
+ * ------------------------------------------------------------------------- */
+::selection {
+  background: var(--foreground);
+  color: var(--background);
 }
