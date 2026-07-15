@@ -1,72 +1,238 @@
-# Database Specification
+# Database Architecture
 
-> This document is the single source of truth for the OverWatch database architecture.
+> This document defines the complete database architecture for OverWatch.
 >
-> Every SQL migration, Supabase table, TypeScript type, repository, server action, and Row Level Security policy must be generated from this specification.
+> Prisma is the authoritative ORM.
 >
-> If implementation conflicts with this document, this document takes precedence.
+> Supabase PostgreSQL is the underlying database.
 
 ---
 
-# Purpose
+# Architecture
 
-The database stores every investigation submitted to OverWatch.
+```
+Next.js
 
-It must support:
+↓
 
-- Anonymous public submissions
-- AI investigation pipeline
-- Administrator review
-- Audit history
-- Future analytics
-- Secure Row Level Security
+Server Actions
 
-The database is the authoritative source of truth.
+↓
 
-Frontend state must never be considered authoritative.
+Repositories
+
+↓
+
+Prisma Client
+
+↓
+
+Supabase PostgreSQL
+```
+
+Prisma is responsible for all database interactions.
+
+Supabase provides:
+
+- PostgreSQL
+- Authentication
+- Storage
+- Realtime
+- Row Level Security
+
+---
+
+# ORM
+
+Use Prisma ORM.
+
+Never use:
+
+```ts
+supabase
+    .from(...)
+```
+
+for application CRUD.
+
+Instead:
+
+```ts
+await prisma.investigation.findMany()
+```
+
+or
+
+```ts
+await prisma.investigation.create(...)
+```
+
+All repositories must communicate through Prisma Client.
+
+---
+
+# Prisma Schema
+
+The file
+
+```
+prisma/schema.prisma
+```
+
+is the authoritative database definition.
+
+Never manually change the database schema without updating Prisma.
+
+Every migration originates from the Prisma schema.
+
+---
+
+# Migration Workflow
+
+Every schema modification follows this order.
+
+```
+schema.prisma
+
+↓
+
+Prisma Migration
+
+↓
+
+Supabase PostgreSQL
+
+↓
+
+Prisma Client Generation
+
+↓
+
+Application
+```
+
+Never create database tables manually unless recovering from an emergency.
 
 ---
 
 # Database Provider
 
-Supabase PostgreSQL
+Provider
 
-Features used:
+PostgreSQL
 
-- PostgreSQL
-- Row Level Security
-- Authentication
-- Storage
-- Realtime (Authenticated Dashboard)
-- SQL Migrations
+Hosted by
 
----
+Supabase
 
-# Design Principles
+Connection
 
-The schema must satisfy the following principles.
+Prisma connects using
 
-- Normalize related data.
-- Avoid duplicate information.
-- Preserve investigation history.
-- Separate AI processing from administrator actions.
-- Use foreign keys wherever appropriate.
-- Never rely on frontend state.
-- Every investigation must be recoverable.
+```
+DATABASE_URL
+```
+
+The Supabase JavaScript client should not be used for CRUD operations.
 
 ---
 
-# Enumerations
+# Models
 
-## Processing Status
+The application currently contains the following models.
 
-Represents the automated investigation pipeline.
+## School
 
-Managed only by the backend.
+Stores registered schools.
 
-Allowed values:
+Relationships
 
-```text
+One school
+
+↓
+
+Many administrators
+
+↓
+
+Many investigations
+
+---
+
+## Admin
+
+Represents authenticated administrators.
+
+Authentication remains managed by Supabase Auth.
+
+Admin records extend authenticated users.
+
+---
+
+## Investigation
+
+Core entity.
+
+Stores
+
+- Submitted URL
+- Processing Status
+- Investigation Status
+- Progress
+- AI findings
+- Report
+- Risk score
+- Confidence
+- Metadata
+- Completion timestamps
+
+---
+
+## InvestigationEvent
+
+Append-only timeline.
+
+Used for:
+
+- Live investigation terminal
+- Audit history
+- Debugging
+- Analytics
+
+Never update existing events.
+
+Always append.
+
+---
+
+## Evidence
+
+Stores structured investigation evidence.
+
+Examples
+
+- Caption
+- Hashtags
+- Comments
+- AI supporting evidence
+
+Avoid large unstructured blobs whenever possible.
+
+---
+
+## AdminNote
+
+Internal administrator comments.
+
+Never exposed publicly.
+
+---
+
+# Processing Status
+
+Backend only.
+
+```
 queued
 fetching_metadata
 metadata_complete
@@ -79,15 +245,11 @@ failed_ai
 
 ---
 
-## Investigation Status
+# Investigation Status
 
-Represents administrator workflow.
+Administrator only.
 
-Managed only by authenticated administrators.
-
-Allowed values:
-
-```text
+```
 pending_review
 under_review
 resolved
@@ -96,564 +258,107 @@ archived
 
 ---
 
-## Severity
+# Progress
 
-Represents AI severity assessment.
+Integer
 
-Allowed values:
-
-```text
-low
-medium
-high
-critical
+```
+0–100
 ```
 
----
+Backend controlled.
 
-# Tables
-
----
-
-# admins
-
-Purpose
-
-Stores authenticated school administrators.
-
-Authentication is handled by Supabase Auth.
-
-This table extends auth.users.
-
-Columns
-
-- id (UUID, Primary Key, references auth.users.id)
-- full_name
-- email
-- school_id
-- role
-- created_at
-- updated_at
-
-Relationships
-
-Many administrators belong to one school.
+Frontend only displays progress.
 
 ---
 
-# schools
+# Transactions
 
-Purpose
+Whenever multiple related writes occur, use Prisma transactions.
 
-Stores schools known to OverWatch.
-
-Columns
-
-- id
-- name
-- short_name
-- state
-- country
-- logo_url
-- created_at
-- updated_at
-
-Relationships
-
-One school has many administrators.
-
-One school may appear in many investigations.
-
----
-
-# investigations
-
-Purpose
-
-Represents a single reported TikTok investigation.
-
-This is the core entity of the system.
-
-Columns
-
-Identity
-
-- id
-- public_id
-- created_at
-- updated_at
-- completed_at
-
-Submission
-
-- submitted_url
-- submitted_by (Guest)
-- submission_ip_hash (optional)
-
-Processing
-
-- processing_status
-- investigation_status
-- progress
-
-TikTok Metadata
-
-- author_username
-- caption
-- upload_timestamp
-- hashtags
-- comment_count
-- like_count
-- share_count
-
-AI Findings
-
-- detected_school_id
-- detected_location
-- sentiment
-- severity
-- risk_score
-- confidence_score
-
-Structured Report
-
-- summary
-- recommendation
-- explanation
-
-Debug
-
-- ai_response_json
-
-Relationships
-
-Many investigations belong to one school.
-
-One investigation has many timeline events.
-
-One investigation has many evidence records.
-
-One investigation has many administrator notes.
-
----
-
-# investigation_events
-
-Purpose
-
-Stores every significant event during an investigation.
-
-This table powers:
-
-- Live Investigation Terminal
-- Audit History
-- Debugging
-- Future Analytics
-
-Columns
-
-- id
-- investigation_id
-- event
-- description
-- progress
-- created_at
-
-Examples
+Example
 
 Investigation Created
 
-Metadata Retrieval Started
+↓
 
-Caption Extracted
+Timeline Event Created
 
-Comments Retrieved
+↓
 
-AI Analysis Started
+Initial Evidence Stored
 
-Risk Score Calculated
+↓
 
-Report Generated
+Commit
 
-Investigation Completed
-
-Relationships
-
-Many events belong to one investigation.
-
-Events are append-only.
-
-Never update or delete events.
+Never allow partial investigation creation.
 
 ---
 
-# evidence
+# Repository Pattern
 
-Purpose
+Every database query must pass through a repository.
 
-Stores structured evidence collected during investigations.
+Example
 
-Avoid storing large unstructured blobs inside investigations.
+```
+src/lib/db/repositories/
+```
 
-Columns
+Possible repositories
 
-- id
-- investigation_id
-- type
-- content
-- source
-- created_at
+```
+investigation.repository.ts
 
-Supported Types
+school.repository.ts
 
-caption
+admin.repository.ts
 
-hashtag
+evidence.repository.ts
 
-comment
+timeline.repository.ts
+```
 
-metadata
-
-ai_evidence
-
-Relationships
-
-Many evidence records belong to one investigation.
+UI components must never import Prisma directly.
 
 ---
 
-# admin_notes
+# Prisma Client
 
-Purpose
+Create a single shared Prisma client.
 
-Allows administrators to leave internal notes.
+```
+src/lib/db/prisma.ts
+```
 
-These notes are never visible publicly.
+Reuse the singleton throughout the application.
 
-Columns
-
-- id
-- investigation_id
-- admin_id
-- note
-- created_at
-- updated_at
-
-Relationships
-
-Many notes belong to one investigation.
-
-Many notes belong to one administrator.
-
----
-
-# Relationships
-
-School
-
-↓
-
-Administrators
-
-School
-
-↓
-
-Investigations
-
-Investigation
-
-↓
-
-Timeline Events
-
-Investigation
-
-↓
-
-Evidence
-
-Investigation
-
-↓
-
-Administrator Notes
-
----
-
-# Indexes
-
-Create indexes for:
-
-investigations.processing_status
-
-investigations.investigation_status
-
-investigations.detected_school_id
-
-investigations.created_at
-
-investigations.public_id
-
-investigation_events.investigation_id
-
-evidence.investigation_id
-
-admin_notes.investigation_id
-
-These indexes are required for dashboard performance.
+Never instantiate Prisma multiple times.
 
 ---
 
 # Row Level Security
 
-Enable Row Level Security on every table.
+Supabase RLS remains enabled.
 
----
+Prisma operates using the server-side database connection.
 
-## Public
-
-Anonymous users may:
-
-Create investigations.
-
-Anonymous users may not:
-
-Read investigations.
-
-Read administrator data.
-
-Read evidence.
-
-Read notes.
-
-Read timeline history.
-
----
-
-## Administrators
-
-Authenticated administrators may:
-
-Read investigations.
-
-Read evidence.
-
-Read timeline.
-
-Read schools.
-
-Create notes.
-
-Update investigation status.
-
-Administrators may not:
-
-Modify AI findings.
-
-Modify investigation history.
-
-Delete investigations.
-
----
-
-## Backend
-
-Service Role may:
-
-Create investigations.
-
-Update investigations.
-
-Insert evidence.
-
-Insert timeline events.
-
-Generate reports.
-
-Update progress.
-
-Service Role bypasses RLS where appropriate.
-
----
-
-# Investigation Lifecycle
-
-Investigation Created
-
-↓
-
-Queued
-
-↓
-
-Fetching Metadata
-
-↓
-
-Metadata Complete
-
-↓
-
-Analyzing
-
-↓
-
-Generating Report
-
-↓
-
-Completed
-
-↓
-
-Pending Review
-
-↓
-
-Under Review
-
-↓
-
-Resolved
-
-↓
-
-Archived
-
-Every transition must be written to:
-
-investigations
-
-AND
-
-investigation_events
-
----
-
-# Progress
-
-Range
-
-0–100
-
-Backend controlled.
-
-Suggested milestones:
-
-0
-
-Investigation Created
-
-20
-
-Metadata Retrieved
-
-60
-
-AI Analysis Complete
-
-80
-
-Report Generated
-
-100
-
-Completed
-
----
-
-# Storage
-
-Supabase Storage
-
-Bucket
-
-```text
-evidence
-```
-
-Future uploads may include:
-
-Screenshots
-
-Supporting documents
-
-Evidence exports
-
-Generated PDFs
-
-Storage should not be required for MVP functionality.
-
----
-
-# Realtime
-
-Realtime is used only for authenticated administrator dashboards.
-
-Anonymous investigation progress should use a secure server-driven mechanism (such as Server-Sent Events) rather than exposing database subscriptions.
-
----
-
-# Generated Types
-
-After every schema change:
-
-1. Apply migration.
-2. Verify tables exist.
-3. Regenerate Supabase TypeScript types.
-4. Update Zod schemas.
-5. Update repositories.
-6. Update server actions.
-
-Never manually edit generated database types.
-
----
-
-# Migration Order
-
-Apply migrations in the following order.
-
-1. Enumerations
-
-2. Schools
-
-3. Admins
-
-4. Investigations
-
-5. Investigation Events
-
-6. Evidence
-
-7. Admin Notes
-
-8. Indexes
-
-9. Row Level Security
-
-10. Storage Buckets
-
-11. Seed Data (Optional)
-
-12. Generate Types
+Authentication decisions are enforced in application logic and Supabase Auth.
 
 ---
 
 # Definition of Done
 
-The database is considered complete only when:
+The database layer is complete only when:
 
-- Every table exists in Supabase.
-- Every foreign key is valid.
-- Every index exists.
-- Row Level Security is enabled.
-- Anonymous users can create investigations only.
-- Administrators can review investigations.
-- Timeline events are recorded.
-- Evidence records are stored correctly.
-- Progress updates persist.
-- Supabase types are regenerated successfully.
-- No schema mismatches exist between the database and TypeScript.
+- Prisma schema matches PostgreSQL.
+- Prisma migrations apply successfully.
+- Prisma Client generates without errors.
+- CRUD operations use Prisma.
+- No application feature uses `supabase.from()` for database access.
+- Authentication continues through Supabase Auth.
+- Storage continues through Supabase Storage.
+- Realtime continues through Supabase services where required.
 
-No application feature should be implemented until every requirement in this document has been satisfied.
+Prisma is the single ORM used throughout the application.
