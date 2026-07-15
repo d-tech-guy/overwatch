@@ -1,10 +1,9 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { tiktokUrlSchema } from "@/lib/validators";
 import { PROCESSING_STATUS, INVESTIGATION_STATUS } from "@/lib/constants";
 import { InvestigationService } from "@/lib/ai/investigation-service";
-import { insertIncident } from "@/lib/db/incidents";
+import { InvestigationRepository } from "@/lib/db/repositories/investigation.repository";
 
 export async function submitIncident(
   formData: FormData
@@ -20,28 +19,26 @@ export async function submitIncident(
     return { error: validation.error.issues[0].message };
   }
 
-  const supabase = await createClient();
+  try {
+    const result = await InvestigationRepository.createWithEventAndEvidence(
+      {
+        submittedUrl: validation.data,
+        processingStatus: PROCESSING_STATUS.queued as any,
+        investigationStatus: INVESTIGATION_STATUS.pendingReview as any,
+        progress: 0,
+      },
+      "Investigation initiated",
+      "URL submitted",
+      "User Submission"
+    );
 
-  // Generate a cryptographically random public token.
-  // This acts as an unguessable bearer credential for the SSE stream.
-  const publicToken = crypto.randomUUID();
+    // Start the background pipeline. Not awaited — the HTTP response
+    // is returned immediately and the service runs independently.
+    InvestigationService.start(result.id);
 
-  const result = await insertIncident(supabase, {
-    tiktok_url: validation.data,
-    processing_status: PROCESSING_STATUS.queued,
-    investigation_status: INVESTIGATION_STATUS.pendingReview,
-    progress: 0,
-    public_token: publicToken,
-    priority: "Low",
-  });
-
-  if (!result) {
+    return { id: result.id, publicToken: result.publicId };
+  } catch (error) {
+    console.error("[submitIncident] Error:", error);
     return { error: "Failed to create investigation. Please try again." };
   }
-
-  // Start the background pipeline. Not awaited — the HTTP response
-  // is returned immediately and the service runs independently.
-  InvestigationService.start(result.id);
-
-  return { id: result.id, publicToken };
 }

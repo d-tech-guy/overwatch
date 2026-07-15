@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model School {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  shortName      String?         @map("short_name")
+  aliases        String[]
+  state          String?
+  country        String?
+  logoUrl        String?         @map("logo_url")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @default(now()) @map("updated_at") @db.Timestamptz(6)
+  admins         Admin[]
+  investigations Investigation[]
+
+  @@map("schools")
+}
+
+model Admin {
+  id        String      @id @db.Uuid
+  fullName  String      @map("full_name")
+  email     String
+  schoolId  String?     @map("school_id") @db.Uuid
+  role      String
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime    @default(now()) @map("updated_at") @db.Timestamptz(6)
+  notes     AdminNote[]
+  school    School?     @relation(fields: [schoolId], references: [id])
+
+  @@map("admins")
+}
+
+model Investigation {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  publicId            String               @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
+  completedAt         DateTime?            @map("completed_at") @db.Timestamptz(6)
+  submittedUrl        String               @map("submitted_url")
+  submittedBy         String?              @map("submitted_by") @db.Uuid
+  submissionIpHash    String?              @map("submission_ip_hash")
+  processingStatus    ProcessingStatus     @default(queued) @map("processing_status")
+  investigationStatus InvestigationStatus  @default(pending_review) @map("investigation_status")
+  progress            Int                  @default(0)
+  authorUsername      String?              @map("author_username")
+  caption             String?
+  uploadTimestamp     DateTime?            @map("upload_timestamp") @db.Timestamptz(6)
+  hashtags            String[]
+  commentCount        Int?                 @map("comment_count")
+  likeCount           Int?                 @map("like_count")
+  shareCount          Int?                 @map("share_count")
+  detectedSchoolId    String?              @map("detected_school_id") @db.Uuid
+  detectedLocation    String?              @map("detected_location")
+  sentiment           String?
+  severity            Severity?
+  riskScore           Int?                 @map("risk_score")
+  confidenceScore     Int?                 @map("confidence_score")
+  summary             String?
+  explanation         String?
+  aiResponseJson      Json?                @map("ai_response_json")
+  adminNotes          AdminNote[]
+  evidence            Evidence[]
+  events              InvestigationEvent[]
+  school              School?              @relation(fields: [detectedSchoolId], references: [id])
+
+  @@index([processingStatus], map: "idx_investigations_processing_status")
+  @@index([investigationStatus], map: "idx_investigations_investigation_status")
+  @@index([detectedSchoolId], map: "idx_investigations_detected_school_id")
+  @@index([createdAt], map: "idx_investigations_created_at")
+  @@index([publicId], map: "idx_investigations_public_id")
+  @@map("investigations")
+}
+
+model InvestigationEvent {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  investigationId String        @map("investigation_id") @db.Uuid
+  event           String
+  description     String?
+  progress        Int?
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+
+  @@index([investigationId], map: "idx_investigation_events_investigation_id")
+  @@map("investigation_events")
+}
+
+model Evidence {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  investigationId String        @map("investigation_id") @db.Uuid
+  type            EvidenceType
+  content         String
+  source          String?
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+
+  @@index([investigationId], map: "idx_evidence_investigation_id")
+  @@map("evidence")
+}
+
+model AdminNote {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  investigationId String        @map("investigation_id") @db.Uuid
+  adminId         String        @map("admin_id") @db.Uuid
+  note            String
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @default(now()) @map("updated_at") @db.Timestamptz(6)
+  admin           Admin         @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+
+  @@index([investigationId], map: "idx_admin_notes_investigation_id")
+  @@map("admin_notes")
+}
+
+enum ProcessingStatus {
+  queued
+  fetching_metadata
+  metadata_complete
+  analyzing
+  report_generating
+  completed
+  failed_metadata
+  failed_ai
+
+  @@map("processing_status")
+}
+
+enum InvestigationStatus {
+  pending_review
+  under_review
+  resolved
+  archived
+
+  @@map("investigation_status")
+}
+
+enum Severity {
+  low
+  medium
+  high
+  critical
+
+  @@map("severity")
+}
+
+enum EvidenceType {
+  caption
+  hashtag
+  comment
+  metadata
+  ai_evidence
+
+  @@map("evidence_type")
+}

@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
-import { getIncidentStatus } from "@/lib/db/incidents";
+import { InvestigationRepository } from "@/lib/db/repositories/investigation.repository";
 import { PROCESSING_STATUS } from "@/lib/constants";
 import type { ProcessingStatus } from "@/types/incident";
 
@@ -8,7 +7,7 @@ import type { ProcessingStatus } from "@/types/incident";
 export const runtime = "nodejs";
 
 // The set of processing statuses that terminate the investigation.
-const TERMINAL_STATUSES = new Set<ProcessingStatus>([
+const TERMINAL_STATUSES = new Set<string>([
   PROCESSING_STATUS.completed,
   PROCESSING_STATUS.failedMetadata,
   PROCESSING_STATUS.failedAi,
@@ -20,7 +19,7 @@ const TERMINAL_STATUSES = new Set<ProcessingStatus>([
  * Streams Server-Sent Events (SSE) for a specific investigation.
  *
  * Security: The caller must supply the `token` query parameter matching
- * the incident's `public_token`. The server validates this before streaming
+ * the incident's `publicId`. The server validates this before streaming
  * any data, ensuring no investigation data is exposed without authorization.
  *
  * The stream polls the database every 2 seconds and emits a `status` event
@@ -41,16 +40,14 @@ export async function GET(
     );
   }
 
-  const supabase = createServiceClient();
-
   // Verify the incident exists and the token matches before opening the stream.
-  const incident = await getIncidentStatus(supabase, id);
+  const incident = await InvestigationRepository.findById(id);
 
   if (!incident) {
     return NextResponse.json({ error: "Investigation not found." }, { status: 404 });
   }
 
-  if (incident.public_token !== token) {
+  if (incident.publicId !== token) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
   }
 
@@ -60,7 +57,7 @@ export async function GET(
 
   const stream = new ReadableStream({
     async start(controller) {
-      let lastStatus = incident.processing_status;
+      let lastStatus = incident.processingStatus as string;
       let lastProgress = incident.progress;
 
       // Emit the current state immediately so the client doesn't wait.
@@ -73,7 +70,7 @@ export async function GET(
 
       const interval = setInterval(async () => {
         try {
-          const current = await getIncidentStatus(supabase, id);
+          const current = await InvestigationRepository.findById(id);
 
           if (!current) {
             clearInterval(interval);
@@ -81,20 +78,23 @@ export async function GET(
             return;
           }
 
+          const currentStatus = current.processingStatus as string;
+          const currentProgress = current.progress;
+
           // Only emit when something has changed.
           if (
-            current.processing_status !== lastStatus ||
-            current.progress !== lastProgress
+            currentStatus !== lastStatus ||
+            currentProgress !== lastProgress
           ) {
-            lastStatus = current.processing_status;
-            lastProgress = current.progress;
+            lastStatus = currentStatus;
+            lastProgress = currentProgress;
             controller.enqueue(
               encoder.encode(formatEvent(lastStatus, lastProgress))
             );
           }
 
           // Close stream on terminal state.
-          if (TERMINAL_STATUSES.has(current.processing_status)) {
+          if (TERMINAL_STATUSES.has(currentStatus)) {
             clearInterval(interval);
             controller.close();
           }
@@ -122,6 +122,6 @@ export async function GET(
   });
 }
 
-function formatEvent(status: ProcessingStatus, progress: number): string {
+function formatEvent(status: string, progress: number): string {
   return `data: ${JSON.stringify({ status, progress })}\n\n`;
 }

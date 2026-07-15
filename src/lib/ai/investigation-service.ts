@@ -1,17 +1,12 @@
 import { PROCESSING_STATUS } from "@/lib/constants";
 import type { ProcessingStatus } from "@/types/incident";
-import { createServiceClient } from "@/lib/supabase/service";
-import {
-  updateIncidentProgress,
-  updateIncidentStatus,
-} from "@/lib/db/incidents";
+import { InvestigationRepository } from "@/lib/db/repositories/investigation.repository";
 
 /**
  * InvestigationService
  *
- * Owns the full investigation lifecycle. Runs entirely server-side and
- * uses the service-role Supabase client so it can operate outside of an
- * active HTTP request context (i.e., after the response has been sent).
+ * Owns the full investigation lifecycle. Runs entirely server-side.
+ * Uses Prisma ORM instead of the service-role Supabase client.
  *
  * The implementation is intentionally provider-agnostic: the pipeline
  * logic lives here and a dedicated job runner (e.g. Trigger.dev, Inngest)
@@ -61,18 +56,15 @@ export class InvestigationService {
     status: ProcessingStatus,
     progress: number
   ): Promise<void> {
-    const supabase = createServiceClient();
-    await updateIncidentProgress(supabase, incidentId, status, progress);
+    await InvestigationRepository.updateProgress(incidentId, status, progress);
   }
 
   static async complete(incidentId: string): Promise<void> {
-    const supabase = createServiceClient();
-    await updateIncidentProgress(supabase, incidentId, PROCESSING_STATUS.completed, 100);
+    await InvestigationRepository.updateProgress(incidentId, PROCESSING_STATUS.completed, 100);
   }
 
   static async fail(incidentId: string, status: ProcessingStatus): Promise<void> {
-    const supabase = createServiceClient();
-    await updateIncidentStatus(supabase, incidentId, status);
+    await InvestigationRepository.updateStatus(incidentId, status);
   }
 
   private static delay(ms: number): Promise<void> {

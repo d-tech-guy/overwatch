@@ -150,7 +150,7 @@ export function InvestigationTerminal({
             <div className="flex justify-end pt-2">
               <button
                 onClick={onFinish}
-                className="font-mono text-xs uppercase tracking-widest px-6 py-2.5 bg-white text-black hover:bg-zinc-200 transition-colors"
+                className="font-mono text-xs uppercase font-semibold tracking-widest px-6 py-2.5 bg-white text-black hover:bg-zinc-200 transition-colors"
               >
                 {isComplete ? "View Report" : "Dismiss"}
               </button>
