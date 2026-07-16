@@ -30,16 +30,24 @@ export const ROUTES = {
 // Protected route prefixes — matched by middleware
 export const PROTECTED_ROUTES = ["/dashboard"] as const;
 
-// Processing statuses (system-managed)
+// Processing statuses (system-managed, v2)
 export const PROCESSING_STATUS = {
   queued: "queued",
-  fetchingMetadata: "fetching_metadata",
-  metadataComplete: "metadata_complete",
-  analyzing: "analyzing",
-  reportGenerating: "report_generating",
+  validatingUrl: "validating_url",
+  creatingInvestigation: "creating_investigation",
+  fetchingVideoMetadata: "fetching_video_metadata",
+  videoMetadataComplete: "video_metadata_complete",
+  fetchingProfile: "fetching_profile",
+  profileComplete: "profile_complete",
+  fetchingComments: "fetching_comments",
+  commentsComplete: "comments_complete",
+  preparingAiContext: "preparing_ai_context",
+  callingGemini: "calling_gemini",
+  aiAnalysisComplete: "ai_analysis_complete",
+  generatingReport: "generating_report",
+  savingResults: "saving_results",
   completed: "completed",
-  failedMetadata: "failed_metadata",
-  failedAi: "failed_ai",
+  failed: "failed",
 } as const;
 
 // Investigation statuses (administrator-managed)

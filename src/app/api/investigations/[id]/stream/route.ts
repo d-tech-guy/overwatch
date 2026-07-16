@@ -1,30 +1,28 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { InvestigationRepository } from "@/lib/db/repositories/investigation.repository";
 import { PROCESSING_STATUS } from "@/lib/constants";
-import type { ProcessingStatus } from "@/types/incident";
 
-// Use Node.js runtime — required for streaming responses on Vercel.
 export const runtime = "nodejs";
 
-// The set of processing statuses that terminate the investigation.
 const TERMINAL_STATUSES = new Set<string>([
   PROCESSING_STATUS.completed,
-  PROCESSING_STATUS.failedMetadata,
-  PROCESSING_STATUS.failedAi,
+  PROCESSING_STATUS.failed,
 ]);
+
+export interface StreamPayload {
+  status: string;
+  progress: number;
+  logs: Array<{ id: string; event: string; description: string; createdAt: string }>;
+}
 
 /**
  * GET /api/investigations/[id]/stream
  *
- * Streams Server-Sent Events (SSE) for a specific investigation.
+ * Streams Server-Sent Events for a specific investigation.
+ * Emits both status/progress updates AND new InvestigationEvent log entries,
+ * allowing the terminal to display real backend work in real time.
  *
- * Security: The caller must supply the `token` query parameter matching
- * the incident's `publicId`. The server validates this before streaming
- * any data, ensuring no investigation data is exposed without authorization.
- *
- * The stream polls the database every 2 seconds and emits a `status` event
- * on every change. It closes automatically when the investigation reaches a
- * terminal state (completed, failed_metadata, or failed_ai).
+ * Security: caller must supply ?token=<publicId>
  */
 export async function GET(
   request: NextRequest,
@@ -34,13 +32,9 @@ export async function GET(
   const token = request.nextUrl.searchParams.get("token");
 
   if (!token) {
-    return NextResponse.json(
-      { error: "Missing token parameter." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing token parameter." }, { status: 400 });
   }
 
-  // Verify the incident exists and the token matches before opening the stream.
   const incident = await InvestigationRepository.findById(id);
 
   if (!incident) {
@@ -51,17 +45,33 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
   }
 
-  // Build the SSE stream.
   const encoder = new TextEncoder();
-  const POLL_INTERVAL_MS = 2000;
+  const POLL_INTERVAL_MS = 1500;
 
   const stream = new ReadableStream({
     async start(controller) {
       let lastStatus = incident.processingStatus as string;
       let lastProgress = incident.progress;
+      let lastEventId = "";
 
-      // Emit the current state immediately so the client doesn't wait.
-      controller.enqueue(encoder.encode(formatEvent(lastStatus, lastProgress)));
+      // Emit current state immediately
+      const initialLogs = (incident.events ?? []).map((e) => ({
+        id: e.id,
+        event: e.event,
+        description: e.description ?? "",
+        createdAt: e.createdAt.toISOString(),
+      }));
+
+      if (initialLogs.length > 0) {
+        lastEventId = initialLogs[initialLogs.length - 1].id;
+      }
+
+      const initialPayload: StreamPayload = {
+        status: lastStatus,
+        progress: lastProgress,
+        logs: initialLogs,
+      };
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(initialPayload)}\n\n`));
 
       if (TERMINAL_STATUSES.has(lastStatus)) {
         controller.close();
@@ -71,7 +81,6 @@ export async function GET(
       const interval = setInterval(async () => {
         try {
           const current = await InvestigationRepository.findById(id);
-
           if (!current) {
             clearInterval(interval);
             controller.close();
@@ -81,19 +90,43 @@ export async function GET(
           const currentStatus = current.processingStatus as string;
           const currentProgress = current.progress;
 
-          // Only emit when something has changed.
-          if (
-            currentStatus !== lastStatus ||
-            currentProgress !== lastProgress
-          ) {
-            lastStatus = currentStatus;
-            lastProgress = currentProgress;
-            controller.enqueue(
-              encoder.encode(formatEvent(lastStatus, lastProgress))
-            );
+          // Find new events since last emit
+          const allEvents = current.events ?? [];
+          const lastIdx = lastEventId
+            ? allEvents.findIndex((e) => e.id === lastEventId)
+            : -1;
+          const newEvents = lastIdx >= 0
+            ? allEvents.slice(lastIdx + 1)
+            : allEvents;
+
+          const newLogs = newEvents.map((e) => ({
+            id: e.id,
+            event: e.event,
+            description: e.description ?? "",
+            createdAt: e.createdAt.toISOString(),
+          }));
+
+          if (newLogs.length > 0) {
+            lastEventId = newLogs[newLogs.length - 1].id;
           }
 
-          // Close stream on terminal state.
+          const hasChange =
+            currentStatus !== lastStatus ||
+            currentProgress !== lastProgress ||
+            newLogs.length > 0;
+
+          if (hasChange) {
+            lastStatus = currentStatus;
+            lastProgress = currentProgress;
+
+            const payload: StreamPayload = {
+              status: currentStatus,
+              progress: currentProgress,
+              logs: newLogs,
+            };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+          }
+
           if (TERMINAL_STATUSES.has(currentStatus)) {
             clearInterval(interval);
             controller.close();
@@ -104,7 +137,6 @@ export async function GET(
         }
       }, POLL_INTERVAL_MS);
 
-      // Clean up if the client disconnects.
       request.signal.addEventListener("abort", () => {
         clearInterval(interval);
         controller.close();
@@ -120,8 +152,4 @@ export async function GET(
       "X-Accel-Buffering": "no",
     },
   });
-}
-
-function formatEvent(status: string, progress: number): string {
-  return `data: ${JSON.stringify({ status, progress })}\n\n`;
 }

@@ -35,6 +35,20 @@ export const env = {
     return requireEnv("GOOGLE_GENERATIVE_AI_API_KEY");
   },
 
+  // Apify (server-only)
+  get apifyToken() {
+    return requireEnv("APIFY_TOKEN");
+  },
+  get apifyVideoActor() {
+    return requireEnv("APIFY_VIDEO_ACTOR");
+  },
+  get apifyProfileActor() {
+    return requireEnv("APIFY_PROFILE_ACTOR");
+  },
+  get apifyCommentsActor() {
+    return requireEnv("APIFY_COMMENTS_ACTOR");
+  },
+
   nodeEnv: (process.env.NODE_ENV ?? "development") as
     | "development"
     | "production"

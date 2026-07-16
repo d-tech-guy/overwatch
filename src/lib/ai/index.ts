@@ -8,9 +8,5 @@
  */
 
 export { runInvestigation } from "./investigation";
-
-export type {
-  InvestigationInput,
-  InvestigationReport,
-  InvestigationResult,
-} from "@/types/ai";
+export type { GeminiInvestigationResult } from "./investigation";
+export { InvestigationService } from "./investigation-service";

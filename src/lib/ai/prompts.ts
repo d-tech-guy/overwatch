@@ -1,202 +1,158 @@
 /**
  * AI Prompt Templates
  *
- * Centralises all prompts used by the investigation pipeline.
+ * Contains the single investigation prompt that sends the entire
+ * evidence package to Gemini in one structured request.
+ *
  * Keeping prompts here (not inside function bodies) makes them
- * easy to review, test, and update independently of the pipeline logic.
+ * easy to review, test, and update independently of the pipeline.
  */
 
-import type { InvestigationInput } from "@/types/ai";
+import type { ApifyVideoMetadata, ApifyProfileMetadata, ApifyCommentMetadata } from "@/types/apify";
+
+export interface InvestigationPromptInput {
+  videoUrl: string;
+  video: ApifyVideoMetadata | null;
+  profile: ApifyProfileMetadata | null;
+  comments: ApifyCommentMetadata[];
+  transcript?: string | null;
+  ocrText?: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatContentSection(input: InvestigationInput): string {
-  const lines: string[] = [];
-
-  if (input.caption) lines.push(`Caption: ${input.caption}`);
-  if (input.hashtags?.length)
-    lines.push(`Hashtags: ${input.hashtags.join(", ")}`);
-  if (input.transcript) lines.push(`Audio Transcript: ${input.transcript}`);
-  if (input.ocrText) lines.push(`On-Screen Text (OCR): ${input.ocrText}`);
-  if (input.creatorUsername)
-    lines.push(`Creator: @${input.creatorUsername}`);
-  if (input.comments?.length) {
-    lines.push(`Comments (${input.comments.length} total):`);
-    input.comments.slice(0, 10).forEach((c) => lines.push(`  - ${c}`));
-  }
-  if (input.uploadedAt) lines.push(`Uploaded: ${input.uploadedAt}`);
-  if (input.viewCount !== undefined)
-    lines.push(`Views: ${input.viewCount.toLocaleString()}`);
-  if (input.likeCount !== undefined)
-    lines.push(`Likes: ${input.likeCount.toLocaleString()}`);
-
-  return lines.join("\n");
-}
-
-// ---------------------------------------------------------------------------
-// School Detection — Stage 1
-// ---------------------------------------------------------------------------
-
-export function buildSchoolDetectionPrompt(
-  input: InvestigationInput,
-  registeredSchools: { name: string; shortName: string; aliases: string[] }[]
-): string {
-  const schoolList = registeredSchools
-    .map(
-      (s) =>
-        `- ${s.name} (short: ${s.shortName}, aliases: ${s.aliases.join(", ")})`
-    )
+function formatVideoSection(video: ApifyVideoMetadata | null, videoUrl: string): string {
+  if (!video) return `Video URL: ${videoUrl}\n(Metadata unavailable)`;
+  return [
+    `Video URL: ${videoUrl}`,
+    video.caption ? `Caption: ${video.caption}` : null,
+    video.authorUsername ? `Author: @${video.authorUsername}` : null,
+    video.authorDisplayName ? `Display Name: ${video.authorDisplayName}` : null,
+    video.uploadDate ? `Upload Date: ${video.uploadDate}` : null,
+    video.duration ? `Duration: ${video.duration}s` : null,
+    video.views !== null ? `Views: ${video.views.toLocaleString()}` : null,
+    video.likes !== null ? `Likes: ${video.likes.toLocaleString()}` : null,
+    video.comments !== null ? `Comment Count: ${video.comments.toLocaleString()}` : null,
+    video.shares !== null ? `Shares: ${video.shares.toLocaleString()}` : null,
+    video.bookmarks !== null ? `Bookmarks: ${video.bookmarks.toLocaleString()}` : null,
+    video.hashtags.length ? `Hashtags: ${video.hashtags.map((h) => `#${h}`).join(" ")}` : null,
+  ]
+    .filter(Boolean)
     .join("\n");
+}
 
-  return `You are an expert cyberbullying investigator. Your task is Stage 1 of 5: School Detection.
+function formatProfileSection(profile: ApifyProfileMetadata | null): string {
+  if (!profile) return "(Creator profile unavailable)";
+  return [
+    profile.username ? `Username: @${profile.username}` : null,
+    profile.displayName ? `Display Name: ${profile.displayName}` : null,
+    profile.bio ? `Bio: ${profile.bio}` : null,
+    profile.followers !== null ? `Followers: ${profile.followers.toLocaleString()}` : null,
+    profile.following !== null ? `Following: ${profile.following.toLocaleString()}` : null,
+    profile.totalLikes !== null ? `Total Likes: ${profile.totalLikes.toLocaleString()}` : null,
+    `Verified: ${profile.verified ? "Yes" : "No"}`,
+    profile.region ? `Region: ${profile.region}` : null,
+    profile.language ? `Language: ${profile.language}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 
-Registered Schools:
-${schoolList}
+function formatCommentsSection(comments: ApifyCommentMetadata[]): string {
+  if (!comments.length) return "(No comments available)";
+  return comments
+    .slice(0, 100)
+    .map((c, i) => {
+      const prefix = c.pinned ? "[PINNED] " : "";
+      const author = c.author ? `@${c.author}` : "Unknown";
+      return `  ${i + 1}. ${prefix}${author}: ${c.text ?? "(empty)"}`;
+    })
+    .join("\n");
+}
 
-TikTok Content:
-${formatContentSection(input)}
+// ---------------------------------------------------------------------------
+// Main investigation prompt
+// ---------------------------------------------------------------------------
 
-Your task:
-Determine whether any registered school is referenced in this TikTok content.
-Schools may be referenced by their full name, abbreviations, nicknames, hashtags, or common misspellings.
+export function buildInvestigationPrompt(input: InvestigationPromptInput): string {
+  return `You are a Senior Cyberbullying Investigator at OverWatch, an AI-powered cyber-forensics platform used by secondary schools.
 
-Respond ONLY with a valid JSON object in this exact format:
+Your role is NOT to summarise TikTok content. Your role is to perform a structured forensic investigation of potentially harmful content targeting schools or students.
+
+You must be objective, evidence-based, and precise. Your output will be reviewed by school administrators making disciplinary decisions.
+
+---
+
+## EVIDENCE PACKAGE
+
+### Video Metadata
+${formatVideoSection(input.video, input.videoUrl)}
+
+### Creator Profile
+${formatProfileSection(input.profile)}
+
+### Comments (${input.comments.length} collected)
+${formatCommentsSection(input.comments)}
+
+${input.transcript ? `### Audio Transcript\n${input.transcript}\n` : ""}
+${input.ocrText ? `### On-Screen Text (OCR)\n${input.ocrText}\n` : ""}
+
+---
+
+## INVESTIGATION QUESTIONS
+
+You must answer every question below. Do not skip any.
+
+1. Is another school or educational institution targeted? If yes, name it.
+2. Are multiple schools mentioned? If yes, list them all.
+3. Are any students, teachers, or staff members identifiable? If yes, who?
+4. Is there evidence of school rivalry or inter-school conflict?
+5. Is cyberbullying present?
+6. Is there harassment?
+7. Is there threatening language?
+8. Is there incitement to violence or retaliation?
+9. Is there hate speech?
+10. Is there defamation or false claims?
+11. Could this content damage a school's reputation?
+12. What is the emotional tone? (hostile / aggressive / mocking / neutral / positive)
+13. How severe is this incident? (Score 0-100. 0-24 = low, 25-49 = medium, 50-74 = high, 75-100 = critical)
+14. How confident are you in your findings? (0-100)
+15. Should administrators review this immediately?
+16. What is your recommended administrative action?
+17. Write a professional executive summary (2-4 sentences) suitable for a school administrator.
+18. Write a detailed explanation of how you reached your conclusion, referencing specific evidence.
+19. List every piece of evidence that supports your findings (direct quotes, usernames, hashtags, etc).
+
+---
+
+## OUTPUT FORMAT
+
+Return ONLY valid JSON. No markdown. No commentary. No explanation outside the JSON.
+
 {
-  "detectedSchool": "<school name or null>",
+  "severity": "low" | "medium" | "high" | "critical",
+  "severityScore": <0-100>,
   "confidence": <0-100>,
-  "matchedTerms": ["<term1>", "<term2>"],
-  "reasoning": "<brief explanation>"
-}`;
+  "targetSchool": "<primary targeted school name or null>",
+  "mentionedSchools": ["<school1>", "<school2>"],
+  "detectedStudents": ["<name or username>"],
+  "location": "<detected city or region or null>",
+  "sentiment": "hostile" | "aggressive" | "mocking" | "neutral" | "positive",
+  "containsBullying": <true|false>,
+  "containsThreat": <true|false>,
+  "containsHarassment": <true|false>,
+  "containsIncitement": <true|false>,
+  "containsHateSpeech": <true|false>,
+  "containsDefamation": <true|false>,
+  "reputationDamage": <true|false>,
+  "requiresImmediateReview": <true|false>,
+  "summary": "<professional executive summary>",
+  "explanation": "<detailed multi-paragraph analysis>",
+  "recommendation": "<specific recommended administrative action>",
+  "evidence": ["<evidence item 1>", "<evidence item 2>", "<evidence item 3>"]
 }
 
-// ---------------------------------------------------------------------------
-// Harm Detection — Stage 2
-// ---------------------------------------------------------------------------
-
-export function buildHarmDetectionPrompt(input: InvestigationInput): string {
-  return `You are an expert cyberbullying investigator. Your task is Stage 2 of 5: Harm Detection.
-
-TikTok Content:
-${formatContentSection(input)}
-
-Your task:
-Determine whether this content contains any of the following harmful behaviours:
-- Cyberbullying
-- Harassment
-- Threats
-- Defamation
-- Hate speech
-- Mockery
-- Public humiliation
-
-Respond ONLY with a valid JSON object in this exact format:
-{
-  "isHarmful": <true|false>,
-  "categories": ["<category1>", "<category2>"],
-  "supportingEvidence": ["<quote or observation1>", "<quote or observation2>"],
-  "reasoning": "<brief explanation>"
-}`;
-}
-
-// ---------------------------------------------------------------------------
-// Context Analysis — Stage 3
-// ---------------------------------------------------------------------------
-
-export function buildContextAnalysisPrompt(input: InvestigationInput): string {
-  return `You are an expert cyberbullying investigator. Your task is Stage 3 of 5: Context Analysis.
-
-TikTok Content:
-${formatContentSection(input)}
-
-Your task:
-Analyse the intent and context of this content. Consider whether the tone is celebratory, critical, threatening, or neutral.
-This step reduces false positives by looking beyond keywords to understand meaning.
-
-Respond ONLY with a valid JSON object in this exact format:
-{
-  "sentiment": "<Positive|Neutral|Negative|Highly Negative>",
-  "intent": "<Positive|Neutral|Ambiguous|Negative>",
-  "contextSummary": "<1-2 sentence explanation of the content's context>"
-}`;
-}
-
-// ---------------------------------------------------------------------------
-// Severity Assessment — Stage 4
-// ---------------------------------------------------------------------------
-
-export function buildSeverityAssessmentPrompt(
-  input: InvestigationInput,
-  harmResult: { isHarmful: boolean; categories: string[] },
-  contextResult: { sentiment: string }
-): string {
-  return `You are an expert cyberbullying investigator. Your task is Stage 4 of 5: Severity Assessment.
-
-TikTok Content:
-${formatContentSection(input)}
-
-Harm Detection Result:
-- Harmful: ${harmResult.isHarmful}
-- Categories: ${harmResult.categories.join(", ") || "None"}
-
-Context Analysis Result:
-- Sentiment: ${contextResult.sentiment}
-
-Your task:
-Evaluate how severe this incident is on a scale of 0-100 (Risk Score).
-Consider: direct targeting, language severity, threats, audience size, repeat insults.
-
-Risk Score Guide:
-- 0-24: Low — Unlikely to cause harm
-- 25-49: Medium — Potentially harmful, monitor
-- 50-74: High — Significant risk, investigate
-- 75-100: Critical — Immediate attention required
-
-Respond ONLY with a valid JSON object in this exact format:
-{
-  "riskScore": <0-100>,
-  "priority": "<Low|Medium|High|Critical>",
-  "factors": ["<factor1>", "<factor2>"]
-}`;
-}
-
-// ---------------------------------------------------------------------------
-// Report Generation — Stage 5
-// ---------------------------------------------------------------------------
-
-export function buildReportGenerationPrompt(
-  input: InvestigationInput,
-  stages: {
-    school: { detectedSchool: string | null; confidence: number };
-    harm: { isHarmful: boolean; categories: string[] };
-    context: { sentiment: string; contextSummary: string };
-    severity: { riskScore: number; priority: string };
-  }
-): string {
-  return `You are an expert cyberbullying investigator. Your task is Stage 5 of 5: Investigation Report Generation.
-
-TikTok Content:
-${formatContentSection(input)}
-
-Investigation Summary:
-- Detected School: ${stages.school.detectedSchool ?? "None"}
-- School Confidence: ${stages.school.confidence}%
-- Harmful: ${stages.harm.isHarmful}
-- Harm Categories: ${stages.harm.categories.join(", ") || "None"}
-- Sentiment: ${stages.context.sentiment}
-- Context: ${stages.context.contextSummary}
-- Risk Score: ${stages.severity.riskScore}/100
-- Priority: ${stages.severity.priority}
-
-Your task:
-Write a concise, professional investigation summary and provide a clear recommended next step for the school administrator.
-The summary must explain WHY this content was flagged, not just what was detected.
-The recommendation must be actionable.
-
-Respond ONLY with a valid JSON object in this exact format:
-{
-  "summary": "<professional investigation summary, 2-4 sentences>",
-  "recommendation": "<specific recommended action for the administrator>"
-}`;
+The JSON must be parseable. Do not include trailing commas or comments.`;
 }

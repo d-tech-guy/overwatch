@@ -121,13 +121,21 @@ model AdminNote {
 
 enum ProcessingStatus {
   queued
-  fetching_metadata
-  metadata_complete
-  analyzing
-  report_generating
+  validating_url
+  creating_investigation
+  fetching_video_metadata
+  video_metadata_complete
+  fetching_profile
+  profile_complete
+  fetching_comments
+  comments_complete
+  preparing_ai_context
+  calling_gemini
+  ai_analysis_complete
+  generating_report
+  saving_results
   completed
-  failed_metadata
-  failed_ai
+  failed
 
   @@map("processing_status")
 }
