@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { login } from "@/actions/auth";
 
 export function LoginForm() {
@@ -90,6 +91,15 @@ export function LoginForm() {
       >
         {isLoading ? "Authenticating..." : "Establish Connection"}
       </button>
+
+      <div className="pt-4 border-t border-zinc-800 flex justify-center mt-2">
+        <Link 
+          href="/admin/register"
+          className="text-zinc-400 hover:text-white text-xs uppercase tracking-widest transition-colors font-mono"
+        >
+          Register Institution
+        </Link>
+      </div>
     </form>
   );
 }

@@ -58,9 +58,64 @@ export const schoolSchema = z.object({
   logoUrl: z.string().url().optional().or(z.literal("")),
 });
 
+// Institution access application (public registration form)
+export const applicationSchema = z.object({
+  institutionName: z
+    .string()
+    .min(3, "Institution name must be at least 3 characters.")
+    .max(120, "Institution name cannot exceed 120 characters."),
+  institutionType: z.enum(["Public", "Private", "Government"]),
+  officialEmail: z.string().email("Please enter a valid official school email."),
+  website: z
+    .string()
+    .url("Website must be a valid URL.")
+    .startsWith("https://", "Website must use HTTPS.")
+    .optional()
+    .or(z.literal("")),
+  address: z.string().max(200).optional(),
+  city: z.string().max(80).optional(),
+  state: z.string().max(80).optional(),
+  country: z.string().min(2, "Country is required.").max(80),
+  schoolPhone: z.string().optional(),
+  administratorName: z
+    .string()
+    .min(3, "Administrator name must be at least 3 characters.")
+    .max(80, "Administrator name cannot exceed 80 characters."),
+  administratorPosition: z
+    .string()
+    .min(2, "Administrator position is required.")
+    .max(80),
+  administratorEmail: z.string().email("Please enter a valid administrator email."),
+  administratorPhone: z
+    .string()
+    .min(5, "Phone number is required.")
+    .max(20, "Phone number is too long."),
+  reason: z
+    .string()
+    .min(10, "Please provide a reason for joining (minimum 10 characters).")
+    .max(1000, "Reason cannot exceed 1000 characters."),
+  agreeToTerms: z.literal(true),
+});
+
+// GOD Console approval
+export const approvalSchema = z.object({
+  applicationId: z.string().uuid(),
+});
+
+// GOD Console rejection
+export const rejectionSchema = z.object({
+  applicationId: z.string().uuid(),
+  reason: z
+    .string()
+    .min(10, "Please provide a rejection reason.")
+    .max(500, "Reason cannot exceed 500 characters."),
+});
+
 // Type exports
 export type IncidentSubmission = z.infer<typeof incidentSubmissionSchema>;
 export type InvestigationNote = z.infer<typeof investigationNoteSchema>;
 export type Resolution = z.infer<typeof resolutionSchema>;
 export type LoginCredentials = z.infer<typeof loginSchema>;
 export type SchoolInput = z.infer<typeof schoolSchema>;
+export type ApplicationInput = z.infer<typeof applicationSchema>;
+export type RejectionInput = z.infer<typeof rejectionSchema>;

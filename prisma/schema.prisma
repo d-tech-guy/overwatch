@@ -169,18 +169,65 @@ enum EvidenceType {
 }
 
 model Application {
-  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  institutionName   String    @map("institution_name")
-  administratorName String    @map("administrator_name")
-  administratorEmail String   @map("administrator_email")
-  website           String?
-  reason            String
-  status            String    @default("pending")
-  reviewedBy        String?   @map("reviewed_by") @db.Uuid
-  reviewedAt        DateTime? @map("reviewed_at") @db.Timestamptz(6)
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  publicId              String            @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+  // Institution details
+  institutionName       String            @map("institution_name")
+  institutionType       String            @default("Unknown") @map("institution_type") // Public | Private | Government
+  officialEmail         String            @default("unknown@example.com") @map("official_email")
+  website               String?
+  address               String?
+  city                  String?
+  state                 String?
+  country               String            @default("")
+  schoolPhone           String?           @map("school_phone")
+  // Administrator details
+  administratorName     String            @map("administrator_name")
+  administratorPosition String            @default("Administrator") @map("administrator_position")
+  administratorEmail    String            @map("administrator_email")
+  administratorPhone    String            @default("0000000000") @map("administrator_phone")
+  // Application details
+  reason                String
+  status                String            @default("pending")
+  notes                 String?
+  // Approval metadata
+  approvedBy            String?           @map("approved_by") @db.Uuid
+  approvedAt            DateTime?         @map("approved_at") @db.Timestamptz(6)
+  schoolId              String?           @map("school_id") @db.Uuid
+  adminUserId           String?           @map("admin_user_id") @db.Uuid
+  // Rejection metadata
+  rejectedBy            String?           @map("rejected_by") @db.Uuid
+  rejectedAt            DateTime?         @map("rejected_at") @db.Timestamptz(6)
+  rejectionReason       String?           @map("rejection_reason")
+  // Suspension metadata
+  suspendedBy           String?           @map("suspended_by") @db.Uuid
+  suspendedAt           DateTime?         @map("suspended_at") @db.Timestamptz(6)
+  suspensionReason      String?           @map("suspension_reason")
+  // Timestamps
+  submittedAt           DateTime          @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  updatedAt             DateTime          @default(now()) @map("updated_at") @db.Timestamptz(6)
 
+  @@index([status], map: "idx_applications_status")
+  @@index([administratorEmail], map: "idx_applications_administrator_email")
   @@map("applications")
+}
+
+model AuditLog {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType     String   @map("entity_type") // "application" | "investigation" | "school" | etc.
+  entityId       String   @map("entity_id") @db.Uuid
+  action         String   // "approved" | "rejected" | "suspended" | etc.
+  previousStatus String?  @map("previous_status")
+  newStatus      String?  @map("new_status")
+  performedBy    String?  @map("performed_by") @db.Uuid
+  reason         String?
+  correlationId  String?  @map("correlation_id") @db.Uuid
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([entityType, entityId], map: "idx_audit_log_entity")
+  @@index([performedBy], map: "idx_audit_log_performed_by")
+  @@map("audit_logs")
 }
 
 model Raid {
