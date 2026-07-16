@@ -167,3 +167,101 @@ enum EvidenceType {
 
   @@map("evidence_type")
 }
+
+model Application {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  institutionName   String    @map("institution_name")
+  administratorName String    @map("administrator_name")
+  administratorEmail String   @map("administrator_email")
+  website           String?
+  reason            String
+  status            String    @default("pending")
+  reviewedBy        String?   @map("reviewed_by") @db.Uuid
+  reviewedAt        DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("applications")
+}
+
+model Raid {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  institutionId  String?   @map("institution_id") @db.Uuid
+  status         RaidStatus @default(queued)
+  keywords       String[]
+  hashtags       String[]
+  creators       String[]
+  configuration  Json?
+  startedAt      DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  jobs           RaidJob[]
+
+  @@map("raids")
+}
+
+model RaidJob {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  raidId      String       @map("raid_id") @db.Uuid
+  provider    String
+  status      RaidStatus   @default(queued)
+  progress    Int          @default(0)
+  targetUrl   String?      @map("target_url")
+  startedAt   DateTime?    @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime?    @map("completed_at") @db.Timestamptz(6)
+  raid        Raid         @relation(fields: [raidId], references: [id], onDelete: Cascade)
+
+  @@index([raidId], map: "idx_raid_jobs_raid_id")
+  @@map("raid_jobs")
+}
+
+model Creator {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  creatorId        String    @unique @map("creator_id")
+  username         String
+  displayName      String?   @map("display_name")
+  profileUrl       String?   @map("profile_url")
+  followerCount    Int?      @map("follower_count")
+  verificationStatus Boolean @default(false) @map("verification_status")
+  riskScore        Int?      @map("risk_score")
+  firstSeen        DateTime  @default(now()) @map("first_seen") @db.Timestamptz(6)
+  lastSeen         DateTime  @default(now()) @map("last_seen") @db.Timestamptz(6)
+
+  @@map("creators")
+}
+
+model Keyword {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keyword        String    @unique
+  category       String?
+  frequency      Int       @default(1)
+  riskAssociation Int?     @map("risk_association")
+  firstSeen      DateTime  @default(now()) @map("first_seen") @db.Timestamptz(6)
+  lastSeen       DateTime  @default(now()) @map("last_seen") @db.Timestamptz(6)
+
+  @@map("keywords")
+}
+
+model Hashtag {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hashtag        String    @unique
+  frequency      Int       @default(1)
+  growthRate     Float?    @map("growth_rate")
+  threatLevel    Int?      @map("threat_level")
+  firstSeen      DateTime  @default(now()) @map("first_seen") @db.Timestamptz(6)
+  lastSeen       DateTime  @default(now()) @map("last_seen") @db.Timestamptz(6)
+
+  @@map("hashtags")
+}
+
+enum RaidStatus {
+  queued
+  searching
+  collecting
+  processing
+  completed
+  cancelled
+  failed
+  timed_out
+
+  @@map("raid_status")
+}

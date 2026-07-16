@@ -27,13 +27,15 @@ import type { ApifyVideoMetadata, ApifyProfileMetadata, ApifyCommentMetadata } f
 const provider = ApifyMetadataProvider;
 
 export class InvestigationService {
-  static start(incidentId: string): void {
-    this.runPipeline(incidentId).catch((err) => {
-      console.error(`[InvestigationService] Unhandled error for ${incidentId}:`, err);
+  static async start(incidentId: string): Promise<void> {
+    const { inngest } = await import("@/lib/inngest/client");
+    await inngest.send({
+      name: "investigation/created",
+      data: { investigationId: incidentId },
     });
   }
 
-  private static async runPipeline(incidentId: string): Promise<void> {
+  public static async runPipeline(incidentId: string): Promise<void> {
     const startedAt = Date.now();
 
     try {

@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { TIKTOK_URL_PATTERN } from "@/lib/constants";
 import { submitIncident } from "@/actions/incidents";
-import { InvestigationTerminal } from "./investigation-terminal";
+import { InvestigationTerminalRealtime } from "./investigation-terminal";
+
+// Re-export alias for any code that still imports InvestigationTerminal
+export { InvestigationTerminalRealtime as InvestigationTerminal };
 
 const schema = z.string().url().regex(TIKTOK_URL_PATTERN);
 
@@ -14,7 +17,10 @@ export function IncidentReportingForm() {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [activeInvestigation, setActiveInvestigation] = useState<{ id: string; publicToken: string } | null>(null);
+  const [activeInvestigation, setActiveInvestigation] = useState<{
+    id: string;
+    publicToken: string;
+  } | null>(null);
 
   const isValid = schema.safeParse(url).success;
 
@@ -38,7 +44,7 @@ export function IncidentReportingForm() {
         setActiveInvestigation({ id: result.id, publicToken: result.publicToken });
         setIsLoading(false);
       }
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
       setIsLoading(false);
     }
@@ -78,13 +84,20 @@ export function IncidentReportingForm() {
       </div>
 
       {activeInvestigation && (
-        <InvestigationTerminal
-          id={activeInvestigation.id}
-          publicToken={activeInvestigation.publicToken}
-          onFinish={() => {
-            router.push(`/report/${activeInvestigation.id}`);
-          }}
-        />
+        <div className="mt-6 max-w-2xl mx-auto">
+          <InvestigationTerminalRealtime
+            investigationId={activeInvestigation.id}
+            publicToken={activeInvestigation.publicToken}
+            initialEvents={[]}
+            initialStatus="queued"
+            initialProgress={0}
+            onComplete={(status) => {
+              if (status === "completed") {
+                router.push(`/report/${activeInvestigation.id}`);
+              }
+            }}
+          />
+        </div>
       )}
     </>
   );

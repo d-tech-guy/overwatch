@@ -149,6 +149,41 @@ export class InvestigationRepository {
           })),
         });
       }
+
+      // Threat Intelligence Extraction
+      if (profile && profile.username) {
+        await tx.creator.upsert({
+          where: { creatorId: profile.username },
+          update: {
+            username: profile.username,
+            displayName: profile.displayName,
+            followerCount: profile.followers,
+            verificationStatus: profile.verified || false,
+            lastSeen: new Date(),
+          },
+          create: {
+            creatorId: profile.username,
+            username: profile.username,
+            displayName: profile.displayName,
+            followerCount: profile.followers,
+            verificationStatus: profile.verified || false,
+          },
+        });
+      }
+
+      // Extract Hashtags (we need to get video metadata from the DB to extract hashtags, or pass it into completeInvestigation)
+      // Since video metadata isn't passed into completeInvestigation, we fetch it first.
+      const inv = await tx.investigation.findUnique({ where: { id }, select: { hashtags: true } });
+      if (inv && inv.hashtags && inv.hashtags.length > 0) {
+        for (const tag of inv.hashtags) {
+          const lowerTag = tag.toLowerCase().replace('#', '');
+          await tx.hashtag.upsert({
+            where: { hashtag: lowerTag },
+            update: { frequency: { increment: 1 }, lastSeen: new Date() },
+            create: { hashtag: lowerTag, frequency: 1 },
+          });
+        }
+      }
     });
   }
 }

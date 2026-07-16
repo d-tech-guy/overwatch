@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { InvestigationRepository } from "@/lib/db/repositories/investigation.repository";
 import { PROCESSING_STATUS } from "@/lib/constants";
+import type { Database } from "@/types/database";
 
 export const runtime = "nodejs";
 
@@ -18,9 +20,9 @@ export interface StreamPayload {
 /**
  * GET /api/investigations/[id]/stream
  *
- * Streams Server-Sent Events for a specific investigation.
- * Emits both status/progress updates AND new InvestigationEvent log entries,
- * allowing the terminal to display real backend work in real time.
+ * Streams Server-Sent Events using Supabase Realtime.
+ * Subscribes to changes on `investigation_events` and `investigations` tables
+ * and forwards them to the connected client with zero polling.
  *
  * Security: caller must supply ?token=<publicId>
  */
@@ -45,16 +47,20 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
   }
 
+  // Use service-role key to bypass RLS for the realtime subscription
+  const supabase = createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   const encoder = new TextEncoder();
-  const POLL_INTERVAL_MS = 1500;
+  let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
 
   const stream = new ReadableStream({
-    async start(controller) {
-      let lastStatus = incident.processingStatus as string;
-      let lastProgress = incident.progress;
-      let lastEventId = "";
+    async start(ctrl) {
+      controller = ctrl;
 
-      // Emit current state immediately
+      // Emit current state immediately so the client has a starting snapshot
       const initialLogs = (incident.events ?? []).map((e) => ({
         id: e.id,
         event: e.event,
@@ -62,84 +68,111 @@ export async function GET(
         createdAt: e.createdAt.toISOString(),
       }));
 
-      if (initialLogs.length > 0) {
-        lastEventId = initialLogs[initialLogs.length - 1].id;
-      }
-
       const initialPayload: StreamPayload = {
-        status: lastStatus,
-        progress: lastProgress,
+        status: incident.processingStatus as string,
+        progress: incident.progress,
         logs: initialLogs,
       };
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify(initialPayload)}\n\n`));
 
-      if (TERMINAL_STATUSES.has(lastStatus)) {
-        controller.close();
+      ctrl.enqueue(encoder.encode(`data: ${JSON.stringify(initialPayload)}\n\n`));
+
+      if (TERMINAL_STATUSES.has(incident.processingStatus as string)) {
+        ctrl.close();
+        supabase.removeAllChannels();
         return;
       }
 
-      const interval = setInterval(async () => {
-        try {
-          const current = await InvestigationRepository.findById(id);
-          if (!current) {
-            clearInterval(interval);
-            controller.close();
-            return;
-          }
-
-          const currentStatus = current.processingStatus as string;
-          const currentProgress = current.progress;
-
-          // Find new events since last emit
-          const allEvents = current.events ?? [];
-          const lastIdx = lastEventId
-            ? allEvents.findIndex((e) => e.id === lastEventId)
-            : -1;
-          const newEvents = lastIdx >= 0
-            ? allEvents.slice(lastIdx + 1)
-            : allEvents;
-
-          const newLogs = newEvents.map((e) => ({
-            id: e.id,
-            event: e.event,
-            description: e.description ?? "",
-            createdAt: e.createdAt.toISOString(),
-          }));
-
-          if (newLogs.length > 0) {
-            lastEventId = newLogs[newLogs.length - 1].id;
-          }
-
-          const hasChange =
-            currentStatus !== lastStatus ||
-            currentProgress !== lastProgress ||
-            newLogs.length > 0;
-
-          if (hasChange) {
-            lastStatus = currentStatus;
-            lastProgress = currentProgress;
-
-            const payload: StreamPayload = {
-              status: currentStatus,
-              progress: currentProgress,
-              logs: newLogs,
+      // Subscribe to new investigation_events for this investigation via Realtime
+      const channel = supabase
+        .channel(`investigation-stream:${id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "investigation_events",
+            filter: `investigation_id=eq.${id}`,
+          },
+          (payload) => {
+            if (!controller) return;
+            const row = payload.new as {
+              id: string;
+              event: string;
+              description: string;
+              created_at: string;
+              progress: number | null;
             };
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+            const eventPayload: StreamPayload = {
+              status: "", // will be overridden by next investigation update
+              progress: row.progress ?? 0,
+              logs: [
+                {
+                  id: row.id,
+                  event: row.event,
+                  description: row.description ?? "",
+                  createdAt: row.created_at,
+                },
+              ],
+            };
+            try {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(eventPayload)}\n\n`));
+            } catch {
+              // Client disconnected
+            }
           }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "investigations",
+            filter: `id=eq.${id}`,
+          },
+          (payload) => {
+            if (!controller) return;
+            const row = payload.new as {
+              processing_status: string;
+              progress: number;
+            };
 
-          if (TERMINAL_STATUSES.has(currentStatus)) {
-            clearInterval(interval);
-            controller.close();
+            const statusPayload: StreamPayload = {
+              status: row.processing_status,
+              progress: row.progress,
+              logs: [],
+            };
+
+            try {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify(statusPayload)}\n\n`)
+              );
+            } catch {
+              // Client disconnected
+            }
+
+            // Close stream when investigation reaches terminal state
+            if (TERMINAL_STATUSES.has(row.processing_status)) {
+              supabase.removeChannel(channel);
+              try {
+                controller.close();
+              } catch {
+                // Already closed
+              }
+              controller = null;
+            }
           }
-        } catch {
-          clearInterval(interval);
-          controller.close();
-        }
-      }, POLL_INTERVAL_MS);
+        )
+        .subscribe();
 
+      // Clean up when client disconnects
       request.signal.addEventListener("abort", () => {
-        clearInterval(interval);
-        controller.close();
+        supabase.removeChannel(channel);
+        try {
+          ctrl.close();
+        } catch {
+          // Already closed
+        }
+        controller = null;
       });
     },
   });

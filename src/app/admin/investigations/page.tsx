@@ -74,7 +74,7 @@ export default async function InvestigationsPage() {
                   <td className="px-4 py-3 text-zinc-400">{inv.authorUsername ? `@${inv.authorUsername}` : '-'}</td>
                   <td className="px-4 py-3 text-zinc-500 text-xs">{inv.createdAt.toLocaleDateString("en-GB")}</td>
                   <td className="px-4 py-3 text-right">
-                    <Link href={`/report/${inv.id}`} className="text-xs uppercase tracking-widest text-white hover:underline">
+                    <Link href={`/admin/investigations/${inv.id}`} className="text-xs uppercase tracking-widest text-white hover:underline">
                       Open
                     </Link>
                   </td>
