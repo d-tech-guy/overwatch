@@ -61,9 +61,9 @@ export default function AdminLayout({
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
               Realtime Active
             </div>
-            <Link href="/" className="text-xs uppercase text-zinc-400 hover:text-white">
-              Public Portal
-            </Link>
+            <a href="/auth/logout" className="text-xs uppercase text-zinc-400 hover:text-white">
+              Disconnect Session
+            </a>
           </div>
         </header>
 

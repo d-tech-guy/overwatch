@@ -16,6 +16,8 @@ model School {
   state          String?
   country        String?
   logoUrl        String?         @map("logo_url")
+  approved       Boolean         @default(false)
+  suspendedAt    DateTime?       @map("suspended_at") @db.Timestamptz(6)
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime        @default(now()) @map("updated_at") @db.Timestamptz(6)
   admins         Admin[]
@@ -30,6 +32,7 @@ model Admin {
   email     String
   schoolId  String?     @map("school_id") @db.Uuid
   role      String
+  isActive  Boolean     @default(true) @map("is_active")
   createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime    @default(now()) @map("updated_at") @db.Timestamptz(6)
   notes     AdminNote[]

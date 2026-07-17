@@ -23,14 +23,21 @@ export function LoginForm() {
 
     try {
       const result = await login(formData);
-      if (result?.error) {
+
+      if ("error" in result) {
         setError(result.error);
         setIsLoading(false);
+        return;
+      }
+
+      // Role-based redirect — never hardcode a single destination.
+      if (result.role === "platform_admin") {
+        router.push("/god");
       } else {
         router.push("/admin");
       }
-    } catch (err) {
-      setError("An unexpected error occurred.");
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
       setIsLoading(false);
     }
   }
@@ -59,12 +66,20 @@ export function LoginForm() {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label
-          htmlFor="password"
-          className="font-mono text-xs uppercase tracking-widest text-zinc-500"
-        >
-          Passphrase
-        </label>
+        <div className="flex items-center justify-between">
+          <label
+            htmlFor="password"
+            className="font-mono text-xs uppercase tracking-widest text-zinc-500"
+          >
+            Passphrase
+          </label>
+          <Link
+            href="/auth/forgot-password"
+            className="font-mono text-xs text-zinc-600 hover:text-zinc-400 uppercase tracking-widest transition-colors"
+          >
+            Forgot?
+          </Link>
+        </div>
         <input
           id="password"
           name="password"
@@ -93,8 +108,8 @@ export function LoginForm() {
       </button>
 
       <div className="pt-4 border-t border-zinc-800 flex justify-center mt-2">
-        <Link 
-          href="/admin/register"
+        <Link
+          href="/auth/register"
           className="text-zinc-400 hover:text-white text-xs uppercase tracking-widest transition-colors font-mono"
         >
           Register Institution

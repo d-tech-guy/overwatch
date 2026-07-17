@@ -79,6 +79,7 @@ export async function approveApplication(applicationId: string, reviewerId: stri
           name: app.institutionName,
           country: app.country,
           state: app.state,
+          approved: true,
         }
       });
 

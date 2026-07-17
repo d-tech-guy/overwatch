@@ -49,7 +49,7 @@ export function RegistrationForm() {
         setError(result.error);
         setIsLoading(false);
       } else if (result?.publicId) {
-        router.push(`/admin/pending?id=${result.publicId}&institutionName=${encodeURIComponent(data.institutionName as string)}`);
+        router.push(`/auth/pending?id=${result.publicId}&institutionName=${encodeURIComponent(data.institutionName as string)}`);
       }
     } catch (err) {
       setError("An unexpected error occurred.");

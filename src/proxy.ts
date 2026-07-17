@@ -2,29 +2,59 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
+/**
+ * Protected route prefixes.
+ *
+ * Any request matching these prefixes requires an authenticated session.
+ * Unauthenticated users are redirected to /auth/login.
+ */
+const PROTECTED_PREFIXES = ["/dashboard", "/god", "/admin"];
+
+/**
+ * Auth routes that authenticated users should never see.
+ *
+ * An already-authenticated user visiting /auth/login is redirected
+ * to their appropriate dashboard instead of showing the login page again.
+ */
+const AUTH_REDIRECT_PATHS = ["/auth/login"];
+
+/**
+ * Public auth paths that should always be accessible, even if authenticated.
+ *
+ * Register, pending, and rejected pages must remain fully public.
+ */
+const ALWAYS_PUBLIC_AUTH_PATHS = [
+  "/auth/register",
+  "/auth/pending",
+  "/auth/rejected",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+];
+
 export default async function proxy(request: NextRequest) {
-  // Update the user's session with Supabase
+  const { pathname } = request.nextUrl;
+
+  // Refresh the Supabase session and retrieve the current user.
   const { supabaseResponse, user } = await updateSession(request);
 
-  const url = request.nextUrl.clone();
-  const isAuthRoute = url.pathname.startsWith("/auth");
-  const isAdminRoute = url.pathname.startsWith("/admin");
-  const isGodRoute = url.pathname.startsWith("/god");
+  const isProtected = PROTECTED_PREFIXES.some((prefix) =>
+    pathname.startsWith(prefix)
+  );
 
-  // Not logged in
-  if (!user) {
-    if (isAdminRoute || isGodRoute) {
-      url.pathname = "/auth/login";
-      return NextResponse.redirect(url);
-    }
-  } else {
-    // Logged in
-    if (isAuthRoute) {
-      url.pathname = "/admin";
-      return NextResponse.redirect(url);
-    }
+  // Redirect unauthenticated users away from protected routes.
+  if (isProtected && !user) {
+    const loginUrl = new URL("/auth/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
 
-    // Role-based protection could go here
+  // Redirect authenticated users away from the login page.
+  if (AUTH_REDIRECT_PATHS.includes(pathname) && user) {
+    // Resolve destination based on role stored in user metadata.
+    const role = user.user_metadata?.role as string | undefined;
+    const destination =
+      role === "platform_admin" ? "/god" : "/admin";
+    return NextResponse.redirect(new URL(destination, request.url));
   }
 
   return supabaseResponse;
@@ -33,12 +63,13 @@ export default async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
+     * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images, svg (public directory assets)
+     * - favicon.ico (browser favicon)
+     * - Public assets (/logo.svg, /favicon.svg, etc.)
+     * - API routes (/api/*)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|favicon\\.svg|logo\\.svg|.*\\.(?:png|jpg|jpeg|gif|webp|svg)$|api/).*)",
   ],
 };

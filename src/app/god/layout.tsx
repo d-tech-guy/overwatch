@@ -23,6 +23,9 @@ export default function GodLayout({
           <Link href="/god" className="px-3 py-2 text-sm text-red-200/70 hover:text-red-400 hover:bg-red-950/30 transition-colors uppercase tracking-wider font-semibold">
             Mission Control
           </Link>
+          <Link href="/god/applications" className="px-3 py-2 text-sm text-red-200/70 hover:text-red-400 hover:bg-red-950/30 transition-colors uppercase tracking-wider font-semibold">
+            Applications
+          </Link>
           <Link href="/god/institutions" className="px-3 py-2 text-sm text-red-200/70 hover:text-red-400 hover:bg-red-950/30 transition-colors uppercase tracking-wider font-semibold">
             Institutions
           </Link>
@@ -64,9 +67,9 @@ export default function GodLayout({
               <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
               Absolute Authority
             </div>
-            <Link href="/admin" className="text-xs uppercase text-zinc-500 hover:text-white transition-colors">
-              Exit God Mode
-            </Link>
+            <a href="/auth/logout" className="text-xs uppercase text-zinc-500 hover:text-white transition-colors">
+              Disconnect Session
+            </a>
           </div>
         </header>
 
