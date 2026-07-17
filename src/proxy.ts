@@ -34,6 +34,28 @@ const ALWAYS_PUBLIC_AUTH_PATHS = [
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  const godCookie = request.cookies.get("god_session")?.value;
+  let godSession = null;
+  if (godCookie) {
+    const { verifyGodSession } = await import("@/lib/god-session");
+    godSession = await verifyGodSession(godCookie);
+  }
+
+  const isGodRoute = pathname.startsWith("/god");
+
+  if (isGodRoute) {
+    if (!godSession || godSession.role !== "GOD") {
+      const loginUrl = new URL("/auth/login", request.url);
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    return NextResponse.next();
+  }
+
+  if (godSession && AUTH_REDIRECT_PATHS.includes(pathname)) {
+    return NextResponse.redirect(new URL("/god", request.url));
+  }
+
   // Refresh the Supabase session and retrieve the current user.
   const { supabaseResponse, user } = await updateSession(request);
 
@@ -52,8 +74,7 @@ export default async function proxy(request: NextRequest) {
   if (AUTH_REDIRECT_PATHS.includes(pathname) && user) {
     // Resolve destination based on role stored in user metadata.
     const role = user.user_metadata?.role as string | undefined;
-    const destination =
-      role === "platform_admin" ? "/god" : "/admin";
+    const destination = role === "platform_admin" ? "/god" : "/admin";
     return NextResponse.redirect(new URL(destination, request.url));
   }
 

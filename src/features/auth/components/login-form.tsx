@@ -36,7 +36,10 @@ export function LoginForm() {
       } else {
         router.push("/admin");
       }
-    } catch {
+    } catch (error: any) {
+      if (error?.message === "NEXT_REDIRECT" || error?.digest?.startsWith("NEXT_REDIRECT")) {
+        throw error;
+      }
       setError("An unexpected error occurred. Please try again.");
       setIsLoading(false);
     }

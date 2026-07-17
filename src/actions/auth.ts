@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
+import { redirect } from "next/navigation";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,6 +33,22 @@ export async function login(formData: FormData): Promise<LoginResult> {
 
   if (!email || !password) {
     return { error: "Email and password are required." };
+  }
+
+  // 1. Platform Administrator (GOD)
+  const godEmail = process.env.GOD_EMAIL;
+  const godPassphrase = process.env.GOD_PASSPHRASE;
+
+  if (godEmail && email === godEmail) {
+    if (password === godPassphrase) {
+      const { createGodSession } = await import("@/lib/god-session");
+      await createGodSession();
+      // Use a zero-UUID for the GOD system log
+      await _writeAuditLog("00000000-0000-0000-0000-000000000000", "login", { role: "GOD" });
+      
+      redirect("/god");
+    }
+    return { error: "Incorrect email or password." };
   }
 
   const supabase = await createClient();
