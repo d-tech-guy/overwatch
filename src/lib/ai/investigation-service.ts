@@ -28,11 +28,18 @@ const provider = ApifyMetadataProvider;
 
 export class InvestigationService {
   static async start(incidentId: string): Promise<void> {
-    const { inngest } = await import("@/lib/inngest/client");
-    await inngest.send({
-      name: "investigation/created",
-      data: { investigationId: incidentId },
-    });
+    try {
+      const { inngest } = await import("@/lib/inngest/client");
+      await inngest.send({
+        name: "investigation/created",
+        data: { investigationId: incidentId },
+      });
+    } catch (error) {
+      console.error("[InvestigationService] Failed to dispatch inngest event:", error);
+      const reason = error instanceof Error ? error.message : "Failed to dispatch event";
+      await InvestigationRepository.updateProgress(incidentId, PROCESSING_STATUS.failed, 0);
+      await InvestigationRepository.logEvent(incidentId, "investigation_failed", `✕ Inngest dispatch failed: ${reason}`);
+    }
   }
 
   public static async runPipeline(incidentId: string): Promise<void> {

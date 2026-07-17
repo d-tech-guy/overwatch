@@ -3,10 +3,10 @@ import { logout } from "@/actions/auth";
 
 export async function GET() {
   await logout();
-  redirect("/");
+  redirect("/auth/login");
 }
 
 export async function POST() {
   await logout();
-  redirect("/");
+  redirect("/auth/login");
 }

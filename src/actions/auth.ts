@@ -43,8 +43,27 @@ export async function login(formData: FormData): Promise<LoginResult> {
     if (password === godPassphrase) {
       const { createGodSession } = await import("@/lib/god-session");
       await createGodSession();
-      // Use a zero-UUID for the GOD system log
-      await _writeAuditLog("00000000-0000-0000-0000-000000000000", "login", { role: "GOD" });
+
+      // Ensure the Platform Administrator record exists in the database
+      let godUser = await prisma.admin.findFirst({
+        where: { email: godEmail, role: "platform_admin" }
+      });
+
+      if (!godUser) {
+        // Seed the platform admin automatically on first successful login
+        godUser = await prisma.admin.create({
+          data: {
+            id: crypto.randomUUID(),
+            fullName: "Platform Administrator",
+            email: godEmail,
+            role: "platform_admin",
+            isActive: true,
+          }
+        });
+      }
+
+      // Use the actual DB UUID for the audit log
+      await _writeAuditLog(godUser.id, "login", { role: "GOD" });
       
       redirect("/god");
     }
@@ -162,12 +181,25 @@ export async function logout(): Promise<LogoutResult> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { error } = await supabase.auth.signOut();
-
-  if (error) {
-    console.error("[auth/logout] Supabase signOut error:", error.message);
-    return { error: "Logout failed. Please try again." };
+  try {
+    await supabase.auth.signOut({ scope: 'local' });
+  } catch (err) {
+    console.error("[auth/logout] Supabase signOut error:", err);
   }
+
+  // Remove the GOD session if it exists
+  const { removeGodSession } = await import("@/lib/god-session");
+  await removeGodSession();
+
+  // Forcibly clear any left-over supabase cookies
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const allCookies = cookieStore.getAll();
+  allCookies.forEach(cookie => {
+    if (cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token")) {
+      cookieStore.delete(cookie.name);
+    }
+  });
 
   if (user) {
     await _writeAuditLog(user.id, "logout", {});
