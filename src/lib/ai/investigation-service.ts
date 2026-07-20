@@ -36,17 +36,50 @@ export class InvestigationService {
         name: "investigation/created",
         data: { investigationId: incidentId },
       });
+
+      // Dispatch succeeded — emit terminal event
+      await InvestigationRepository.logEvent(
+        incidentId,
+        "inngest_dispatched",
+        "Background worker dispatched. Waiting for Inngest execution...",
+        0,
+        {
+          stage: "queued",
+          severity: "info",
+          type: "inngest_dispatch_success",
+          shortMessage: "Background worker dispatched",
+          correlationId,
+        }
+      );
     } catch (error) {
       console.error("[InvestigationService] Failed to dispatch inngest event:", error);
-      const reason = error instanceof Error ? error.message : "Failed to dispatch event";
+
+      // Categorize the error
+      let category = "unknown";
+      let reason = "Failed to dispatch event";
+      if (error instanceof Error) {
+        reason = error.message;
+        if (reason.includes("event key") || reason.includes("INNGEST_EVENT_KEY")) {
+          category = "configuration";
+        } else if (reason.includes("fetch") || reason.includes("ECONNREFUSED") || reason.includes("network")) {
+          category = "network";
+        } else if (reason.includes("payload") || reason.includes("invalid")) {
+          category = "payload";
+        } else {
+          category = "provider";
+        }
+      }
+
+      // Persist error — never crash the application
       await InvestigationRepository.updateProgress(incidentId, PROCESSING_STATUS.failed, 0);
       await InvestigationRepository.logEvent(incidentId, "investigation_failed", `✕ Inngest dispatch failed: ${reason}`, 0, {
         stage: "queued",
         severity: "fatal",
         type: "inngest_failed",
         shortMessage: "Inngest dispatch failed",
-        detailedMessage: reason,
+        detailedMessage: `[${category}] ${reason}`,
         correlationId,
+        metadataJson: { errorCategory: category },
       });
     }
   }

@@ -1,5 +1,6 @@
 import { inngest } from "./client";
 import { InvestigationService } from "@/lib/ai/investigation-service";
+import { InvestigationRepository } from "@/lib/db/repositories/investigation.repository";
 import { RaidService } from "@/lib/raid/raid-service";
 
 /**
@@ -19,6 +20,21 @@ export const processInvestigation = inngest.createFunction(
   },
   async ({ event }: { event: { data: { investigationId: string } } }) => {
     const { investigationId } = event.data;
+
+    // Emit terminal event: Worker has started
+    await InvestigationRepository.logEvent(
+      investigationId,
+      "worker_connected",
+      "✓ Worker connected. Pipeline execution started.",
+      0,
+      {
+        stage: "queued",
+        severity: "success",
+        type: "worker_connected",
+        shortMessage: "Inngest worker connected and pipeline starting",
+      }
+    );
+
     await InvestigationService.runPipeline(investigationId);
     return { status: "completed", investigationId };
   }
