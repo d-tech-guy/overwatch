@@ -88,6 +88,14 @@ model InvestigationEvent {
   event           String
   description     String?
   progress        Int?
+  stage           String?
+  severity        String?
+  type            String?
+  shortMessage    String?       @map("short_message")
+  detailedMessage String?       @map("detailed_message")
+  duration        Int?
+  correlationId   String?       @map("correlation_id")
+  metadataJson    Json?         @map("metadata_json")
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
 
@@ -315,3 +323,68 @@ enum RaidStatus {
 
   @@map("raid_status")
 }
+
+model Report {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title           String
+  investigationId String?       @map("investigation_id") @db.Uuid
+  schoolId        String?       @map("school_id") @db.Uuid
+  severity        Severity
+  content         Json
+  generatedAt     DateTime      @default(now()) @map("generated_at") @db.Timestamptz(6)
+  
+  @@index([schoolId], map: "idx_reports_school_id")
+  @@map("reports")
+}
+
+model Notification {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  message     String
+  type        String    // "system", "alert", "broadcast"
+  read        Boolean   @default(false)
+  userId      String?   @map("user_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId], map: "idx_notifications_user_id")
+  @@map("notifications")
+}
+
+model BackgroundJob {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  status      String    // "queued", "running", "completed", "failed"
+  payload     Json?
+  error       String?
+  startedAt   DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([status], map: "idx_background_jobs_status")
+  @@map("background_jobs")
+}
+
+model SystemHealthSnapshot {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  component   String    // "database", "ai", "realtime"
+  status      String    // "healthy", "degraded", "down"
+  latencyMs   Int?      @map("latency_ms")
+  timestamp   DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([component, timestamp], map: "idx_system_health_snapshot")
+  @@map("system_health_snapshots")
+}
+
+model AiMetric {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider    String    // "gemini", "openai"
+  model       String
+  latencyMs   Int       @map("latency_ms")
+  tokensUsed  Int       @map("tokens_used")
+  success     Boolean   @default(true)
+  timestamp   DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([provider, timestamp], map: "idx_ai_metrics_provider")
+  @@map("ai_metrics")
+}
+

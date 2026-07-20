@@ -42,3 +42,60 @@ export async function submitIncident(
     return { error: "Failed to create investigation. Please try again." };
   }
 }
+
+export async function getInvestigationState(id: string) {
+  try {
+    const investigation = await InvestigationRepository.findById(id);
+    if (!investigation) {
+      return { error: "Investigation not found" };
+    }
+    return {
+      status: investigation.processingStatus,
+      progress: investigation.progress,
+      events: investigation.events.map((e) => ({
+        id: e.id,
+        event: e.event,
+        description: e.description ?? "",
+        createdAt: e.createdAt.toISOString(),
+        progress: e.progress,
+        stage: e.stage,
+        severity: e.severity,
+        type: e.type,
+        shortMessage: e.shortMessage,
+        detailedMessage: e.detailedMessage,
+        duration: e.duration,
+        correlationId: e.correlationId,
+        metadataJson: e.metadataJson,
+      })),
+    };
+  } catch (error) {
+    console.error("[getInvestigationState] Error:", error);
+    return { error: "Failed to fetch investigation state" };
+  }
+}
+
+export async function retryInvestigation(id: string) {
+  try {
+    const { prisma } = await import("@/lib/db/prisma");
+    const investigation = await InvestigationRepository.findById(id);
+    if (!investigation) {
+      return { error: "Investigation not found" };
+    }
+
+    // Reset status and progress
+    await InvestigationRepository.updateProgress(id, PROCESSING_STATUS.queued as any, 0);
+
+    // Delete old events to start fresh
+    await prisma.investigationEvent.deleteMany({
+      where: { investigationId: id },
+    });
+
+    // Start background job again
+    InvestigationService.start(id);
+
+    return { success: true };
+  } catch (error) {
+    console.error("[retryInvestigation] Error:", error);
+    return { error: "Failed to restart investigation" };
+  }
+}

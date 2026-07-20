@@ -32,6 +32,10 @@ export class InvestigationRepository {
           event: "investigation_created",
           description: eventDescription,
           progress: 0,
+          stage: "queued",
+          severity: "info",
+          type: "investigation_created",
+          shortMessage: "Investigation initiated",
         },
       });
 
@@ -70,10 +74,33 @@ export class InvestigationRepository {
     investigationId: string,
     event: string,
     description: string,
-    progress?: number
+    progress?: number,
+    extra?: {
+      stage?: string;
+      severity?: string;
+      type?: string;
+      shortMessage?: string;
+      detailedMessage?: string;
+      duration?: number;
+      correlationId?: string;
+      metadataJson?: any;
+    }
   ) {
     return prisma.investigationEvent.create({
-      data: { investigationId, event, description, progress },
+      data: {
+        investigationId,
+        event,
+        description,
+        progress,
+        stage: extra?.stage,
+        severity: extra?.severity,
+        type: extra?.type,
+        shortMessage: extra?.shortMessage,
+        detailedMessage: extra?.detailedMessage,
+        duration: extra?.duration,
+        correlationId: extra?.correlationId,
+        metadataJson: extra?.metadataJson ? (extra.metadataJson as any) : undefined,
+      },
     });
   }
 
