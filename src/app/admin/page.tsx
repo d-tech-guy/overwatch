@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { InvestigationRepository } from "@/lib/db/repositories/investigation.repository";
+
 import { prisma } from "@/lib/db/prisma";
 import { PROCESSING_STATUS } from "@/lib/constants";
 
@@ -12,7 +12,7 @@ export default async function AdminDashboardPage() {
     prisma.investigation.count({
       where: {
         processingStatus: {
-          notIn: [PROCESSING_STATUS.completed as any, PROCESSING_STATUS.failed as any],
+          notIn: [PROCESSING_STATUS.completed as import("@prisma/client").ProcessingStatus, PROCESSING_STATUS.failed as import("@prisma/client").ProcessingStatus],
         },
       },
     }),

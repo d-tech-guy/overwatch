@@ -319,7 +319,7 @@ export class InvestigationService {
       // ------------------------------------------------------------------ //
       // Stage 4 — Prepare AI Context (65%)
       // ------------------------------------------------------------------ //
-      const contextStart = Date.now();
+      // ------------------------------------------------------------------ //
       await this.progress(incidentId, PROCESSING_STATUS.preparingAiContext, 65, "Preparing AI evidence package...", {
         correlationId,
         severity: "info",
@@ -329,7 +329,6 @@ export class InvestigationService {
         severity: "info",
         correlationId,
       });
-      const contextDuration = Date.now() - contextStart;
 
       // ------------------------------------------------------------------ //
       // Stage 5 — Call Gemini with Retry Logic (80%)
@@ -427,7 +426,7 @@ export class InvestigationService {
       // ------------------------------------------------------------------ //
       // Stage 6 — Generate Report (90%)
       // ------------------------------------------------------------------ //
-      const reportStart = Date.now();
+      // ------------------------------------------------------------------ //
       await this.progress(incidentId, PROCESSING_STATUS.generatingReport, 90, "Generating intelligence report...", {
         correlationId,
         severity: "info",
@@ -437,12 +436,11 @@ export class InvestigationService {
         severity: "info",
         correlationId,
       });
-      const reportDuration = Date.now() - reportStart;
 
       // ------------------------------------------------------------------ //
       // Stage 7 — Save Results (95%)
       // ------------------------------------------------------------------ //
-      const saveStart = Date.now();
+      // ------------------------------------------------------------------ //
       await this.progress(incidentId, PROCESSING_STATUS.savingResults, 95, "Persisting investigation...", {
         correlationId,
         severity: "info",
@@ -455,7 +453,6 @@ export class InvestigationService {
 
       const processingMs = Date.now() - pipelineStart;
       await InvestigationRepository.completeInvestigation(incidentId, aiResult, profile, comments, processingMs);
-      const saveDuration = Date.now() - saveStart;
 
       // ------------------------------------------------------------------ //
       // Stage 8 — Complete (100%)
@@ -509,7 +506,7 @@ export class InvestigationService {
       detailedMessage?: string;
       duration?: number;
       correlationId?: string;
-      metadataJson?: any;
+      metadataJson?: unknown;
     }
   ): Promise<void> {
     await InvestigationRepository.updateProgress(id, status, progress);
@@ -535,7 +532,7 @@ export class InvestigationService {
       detailedMessage?: string;
       duration?: number;
       correlationId?: string;
-      metadataJson?: any;
+      metadataJson?: unknown;
     }
   ): Promise<void> {
     await InvestigationRepository.logEvent(id, event, description, progress, extra);

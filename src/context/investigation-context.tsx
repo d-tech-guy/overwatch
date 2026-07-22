@@ -1,10 +1,9 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 import { submitIncident } from "@/actions/incidents";
 import { PROCESSING_STATUS } from "@/lib/constants";
 
-type InvestigationStage = keyof typeof PROCESSING_STATUS;
 
 interface InvestigationContextType {
   activeInvestigationId: string | null;

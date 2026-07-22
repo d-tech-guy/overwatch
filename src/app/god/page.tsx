@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db/prisma";
-
 export const dynamic = "force-dynamic";
 
 export default async function GodMissionControlPage() {

@@ -1,5 +1,5 @@
 import { prisma } from "../prisma";
-import type { Prisma } from "@prisma/client";
+import { Prisma, ProcessingStatus, Severity, EvidenceType } from "@prisma/client";
 import type { GeminiInvestigationResult } from "@/lib/ai/investigation";
 import type { ApifyVideoMetadata, ApifyProfileMetadata, ApifyCommentMetadata } from "@/types/apify";
 
@@ -56,7 +56,7 @@ export class InvestigationRepository {
     return prisma.investigation.update({
       where: { id },
       data: {
-        processingStatus: processingStatus as any,
+        processingStatus: processingStatus as ProcessingStatus,
         progress,
       },
     });
@@ -65,7 +65,7 @@ export class InvestigationRepository {
   static async updateStatus(id: string, processingStatus: string) {
     return prisma.investigation.update({
       where: { id },
-      data: { processingStatus: processingStatus as any },
+      data: { processingStatus: processingStatus as ProcessingStatus },
     });
   }
 
@@ -83,7 +83,7 @@ export class InvestigationRepository {
       detailedMessage?: string;
       duration?: number;
       correlationId?: string;
-      metadataJson?: any;
+      metadataJson?: unknown;
     }
   ) {
     return prisma.investigationEvent.create({
@@ -99,7 +99,7 @@ export class InvestigationRepository {
         detailedMessage: extra?.detailedMessage,
         duration: extra?.duration,
         correlationId: extra?.correlationId,
-        metadataJson: extra?.metadataJson ? (extra.metadataJson as any) : undefined,
+        metadataJson: extra?.metadataJson ? (extra.metadataJson as Prisma.InputJsonValue) : undefined,
       },
     });
   }
@@ -133,7 +133,7 @@ export class InvestigationRepository {
       await tx.investigation.update({
         where: { id },
         data: {
-          processingStatus: "completed" as any,
+          processingStatus: "completed" as ProcessingStatus,
           progress: 100,
           completedAt: new Date(),
           aiResponseJson: {
@@ -142,11 +142,11 @@ export class InvestigationRepository {
             geminiModel: "gemini-2.0-flash",
             commentsRetrieved: comments.length,
             profile,
-          } as any,
+          } as Prisma.InputJsonValue,
           summary: aiResult.summary,
           explanation: aiResult.explanation,
           sentiment: aiResult.sentiment,
-          severity: aiResult.severity as any,
+          severity: aiResult.severity as Severity,
           riskScore: aiResult.severityScore,
           confidenceScore: aiResult.confidence,
           detectedLocation: aiResult.location ?? undefined,
@@ -158,7 +158,7 @@ export class InvestigationRepository {
         await tx.evidence.createMany({
           data: aiResult.evidence.map((content) => ({
             investigationId: id,
-            type: "ai_evidence" as any,
+            type: "ai_evidence" as EvidenceType,
             content,
             source: "Gemini AI",
           })),
@@ -170,7 +170,7 @@ export class InvestigationRepository {
         await tx.evidence.createMany({
           data: comments.slice(0, 20).map((c) => ({
             investigationId: id,
-            type: "comment" as any,
+            type: "comment" as EvidenceType,
             content: `@${c.author ?? "unknown"}: ${c.text ?? ""}`,
             source: "TikTok Comments",
           })),

@@ -23,8 +23,8 @@ export async function submitIncident(
     const result = await InvestigationRepository.createWithEventAndEvidence(
       {
         submittedUrl: validation.data,
-        processingStatus: PROCESSING_STATUS.queued as any,
-        investigationStatus: INVESTIGATION_STATUS.pendingReview as any,
+        processingStatus: PROCESSING_STATUS.queued as import("@prisma/client").ProcessingStatus,
+        investigationStatus: INVESTIGATION_STATUS.pendingReview as import("@prisma/client").InvestigationStatus,
         progress: 0,
       },
       "Investigation initiated",
@@ -83,7 +83,7 @@ export async function retryInvestigation(id: string) {
     }
 
     // Reset status and progress
-    await InvestigationRepository.updateProgress(id, PROCESSING_STATUS.queued as any, 0);
+    await InvestigationRepository.updateProgress(id, PROCESSING_STATUS.queued, 0);
 
     // Delete old events to start fresh
     await prisma.investigationEvent.deleteMany({

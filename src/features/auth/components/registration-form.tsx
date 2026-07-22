@@ -51,7 +51,7 @@ export function RegistrationForm() {
       } else if (result?.publicId) {
         router.push(`/auth/pending?id=${result.publicId}&institutionName=${encodeURIComponent(data.institutionName as string)}`);
       }
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred.");
       setIsLoading(false);
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getInvestigationState } from "@/actions/incidents";
 
@@ -19,7 +19,7 @@ export interface TerminalEvent {
   detailedMessage?: string;
   duration?: number;
   correlationId?: string;
-  metadataJson?: any;
+  metadataJson?: unknown;
 }
 
 type Severity = "success" | "error" | "warning" | "info" | "fatal";
@@ -70,7 +70,6 @@ interface InvestigationTerminalRealtimeProps {
 
 export function InvestigationTerminalRealtime({
   investigationId,
-  publicToken,
   initialEvents,
   initialStatus,
   initialProgress,
@@ -86,7 +85,7 @@ export function InvestigationTerminalRealtime({
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const isTerminal = status === "completed" || status === "failed";
 
@@ -118,7 +117,7 @@ export function InvestigationTerminalRealtime({
             detailed_message: string | null;
             duration: number | null;
             correlation_id: string | null;
-            metadata_json: any;
+            metadata_json: unknown;
           };
           setEvents((prev) => {
             if (prev.some((e) => e.id === row.id)) return prev;
@@ -209,6 +208,7 @@ export function InvestigationTerminalRealtime({
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [investigationId, isTerminal]);
 
   // ── Auto-scroll ──────────────────────────────────────────────────────────────

@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { approveApplication, rejectApplication } from "@/actions/applications";
 
+import type { Application } from "@prisma/client";
+
 // Note: In a real app we'd fetch this server-side, but for now we'll accept props
-export function ApplicationCard({ application }: { application: any }) {
+export function ApplicationCard({ application }: { application: Application }) {
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [isLoading, setIsLoading] = useState(false);

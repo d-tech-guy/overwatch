@@ -24,7 +24,7 @@ export default function RejectedPage() {
               Access Denied
             </h1>
             <p className="font-mono text-sm text-zinc-400 leading-relaxed">
-              Your institution's application to access the {APP_NAME} Operations Center has been rejected.
+              Your institution&apos;s application to access the {APP_NAME} Operations Center has been rejected.
             </p>
           </div>
         </div>

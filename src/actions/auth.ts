@@ -259,7 +259,7 @@ async function _writeAuditLog(
         entityId: userId,
         action,
         performedBy: userId,
-        metadata: metadata as any,
+        metadata: metadata as import("@prisma/client").Prisma.InputJsonValue,
       },
     });
   } catch (err) {

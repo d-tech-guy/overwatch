@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { APP_NAME } from "@/lib/constants";
+
 
 import { initiateRaidAction } from "@/actions/raid";
 

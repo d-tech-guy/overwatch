@@ -25,18 +25,7 @@ if (!INNGEST_SIGNING_KEY) {
 
 // ─── Event Type Definitions ──────────────────────────────────────────────────
 
-type Events = {
-  "investigation/created": {
-    data: {
-      investigationId: string;
-    };
-  };
-  "raid/created": {
-    data: {
-      raidId: string;
-    };
-  };
-};
+
 
 // ─── Client Initialization ───────────────────────────────────────────────────
 

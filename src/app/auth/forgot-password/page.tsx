@@ -11,7 +11,7 @@ export default function ForgotPasswordPage() {
   return (
     <main className="min-h-screen bg-black flex flex-col justify-center items-center p-4">
       <div className="w-full max-w-sm space-y-8">
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-2 z-10">
           <Image
             src="/logo.svg"
             width={180}

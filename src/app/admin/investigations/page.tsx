@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { InvestigationRepository } from "@/lib/db/repositories/investigation.repository";
+
 import { prisma } from "@/lib/db/prisma";
 
 export const dynamic = "force-dynamic";

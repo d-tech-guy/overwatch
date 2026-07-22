@@ -33,6 +33,7 @@ export async function submitApplication(formData: FormData) {
 
   try {
     const { agreeToTerms, ...applicationData } = validation.data;
+    void agreeToTerms;
     const application = await ApplicationRepository.create(applicationData);
     
     return { id: application.id, publicId: application.publicId };

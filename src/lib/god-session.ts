@@ -111,7 +111,7 @@ export async function verifyGodSession(cookieValue?: string): Promise<GodSession
     if (payload.exp < Math.floor(Date.now() / 1000)) return null;
 
     return payload;
-  } catch (err) {
+  } catch {
     return null;
   }
 }

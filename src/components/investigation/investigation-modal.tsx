@@ -30,7 +30,8 @@ export function InvestigationModal() {
     if (!isModalOpen || !activeInvestigationId) return;
 
     let isMounted = true;
-    setLoading(true);
+    // Defer setLoading to avoid synchronous setState warning
+    setTimeout(() => { if (isMounted) setLoading(true); }, 0);
 
     getInvestigationState(activeInvestigationId).then((res) => {
       if (!isMounted) return;
@@ -62,6 +63,7 @@ export function InvestigationModal() {
     return () => {
       isMounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeInvestigationId, isModalOpen]);
 
   if (!isModalOpen || !activeInvestigationId) return null;

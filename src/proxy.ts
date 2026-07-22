@@ -18,18 +18,7 @@ const PROTECTED_PREFIXES = ["/dashboard", "/god", "/admin"];
  */
 const AUTH_REDIRECT_PATHS = ["/auth/login"];
 
-/**
- * Public auth paths that should always be accessible, even if authenticated.
- *
- * Register, pending, and rejected pages must remain fully public.
- */
-const ALWAYS_PUBLIC_AUTH_PATHS = [
-  "/auth/register",
-  "/auth/pending",
-  "/auth/rejected",
-  "/auth/forgot-password",
-  "/auth/reset-password",
-];
+
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

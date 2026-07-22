@@ -1,7 +1,7 @@
 "use client";
 
 import { useInvestigationContext } from "@/context/investigation-context";
-import { Maximize2, X, Activity } from "lucide-react";
+import { Maximize2, X } from "lucide-react";
 import { PROCESSING_STATUS } from "@/lib/constants";
 
 export function BackgroundDock() {

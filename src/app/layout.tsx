@@ -6,13 +6,18 @@ import "./globals.css";
 import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  preload: false,
+});
 
 const ibmPlexMono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
   variable: "--font-mono",
   display: "swap",
+  preload: false,
 });
 
 const jotiOne = Joti_One({
@@ -20,6 +25,7 @@ const jotiOne = Joti_One({
   weight: ["400"],
   variable: "--font-heading",
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
